@@ -1,0 +1,244 @@
+# ================================
+# IDE & Editor
+# ================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ================================
+# OS Generated Files
+# ================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ================================
+# Environment Variables
+# ================================
+.env
+.env.local
+.env.production
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+*.env
+
+# ================================
+# Frontend (Node.js / React / Vue)
+# ================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build output
+dist/
+build/
+out/
+.next/
+.nuxt/
+.output/
+
+# Cache
+.cache/
+.parcel-cache/
+.turbo/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# Testing
+coverage/
+
+# ================================
+# Backend (Java / Spring Boot)
+# ================================
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+*.logs
+
+# Gradle
+.gradle/
+**/build/
+!src/**/build/
+
+# Maven
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# ================================
+# Backend (Python / FastAPI / Django)
+# ================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+.venv/
+ENV/
+env/
+.env/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ================================
+# AI / Machine Learning
+# ================================
+# Model files
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.joblib
+*.pt
+*.pth
+*.onnx
+*.pb
+*.tflite
+*.weights
+*.ckpt
+*.ckpt.*
+saved_model/
+checkpoints/
+
+# Dataset (large files)
+*.csv
+*.parquet
+*.feather
+!**/sample*.csv
+data/
+datasets/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# MLflow
+mlruns/
+
+# Weights & Biases
+wandb/
+
+# ================================
+# AI - PaddleOCR (ai/ 폴더)
+# ================================
+# 생성된 데이터
+ai/generated/*
+ai/paddle_data/
+ai/model_test/
+
+# PaddleOCR 클론 레포지토리
+ai/PaddleOCR/
+
+# 학습 결과물
+ai/output/
+*.pdparams
+*.pdopt
+*.pdmodel
+*.pdiparams
+
+# 설정 파일 (로컬 설정)
+ai/effect_config.json
+
+# 폰트파일
+ai/fonts/
+
+# 이미지 데이터
+ai/paddle_recong_dataset/*
+
+# AI Models
+ai/models/
+ai/model/
+
+# ================================
+# Embedded
+# ================================
+# Build files
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+
+# Arduino
+*.ino.eep
+*.ino.elf
+*.ino.hex
+*.ino.with_bootloader.hex
+
+# ESP-IDF
+sdkconfig
+sdkconfig.old
+
+# ================================
+# Logs & Temporary Files
+# ================================
+logs/
+*.log
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# ================================
+# Secrets & Credentials
+# ================================
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+secrets/
+credentials/
