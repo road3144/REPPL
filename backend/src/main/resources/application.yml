@@ -1,20 +1,40 @@
-spring.application.name=reppl
+spring:
+  application:
+    name: reppl
 
-# Redis
-spring.data.redis.host=${REDIS_HOST:localhost}
-spring.data.redis.port=${REDIS_PORT:6379}
+  # Redis
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
-# Spring Session (Redis)
-spring.session.store-type=redis
-spring.session.timeout=86400s
+  # Spring Session (Redis)
+  session:
+    store-type: redis
+    timeout: 86400s
 
-# Kafka Consumer
-spring.kafka.bootstrap-servers=${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-spring.kafka.consumer.group-id=${KAFKA_CONSUMER_GROUP_ID:reppl-spring}
-spring.kafka.consumer.auto-offset-reset=earliest
-spring.kafka.consumer.key-deserializer=org.apache.kafka.common.serialization.StringDeserializer
-spring.kafka.consumer.value-deserializer=org.apache.kafka.common.serialization.StringDeserializer
+  # Kafka Consumer
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP_ID:reppl-spring}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
 # Kafka Topic
-kafka.topic.job-progress=vppl.job.progress.v1
-kafka.topic.job-progress.partitions=3
+kafka:
+  topic:
+    job-progress: vppl.job.progress.v1
+    job-progress.partitions: 3
+
+# AWS S3
+cloud:
+  aws:
+    credentials:
+      access-key: ${AWS_ACCESS_KEY}
+      secret-key: ${AWS_SECRET_KEY}
+    region:
+      static: ${AWS_REGION}
+    s3:
+      bucket: ${AWS_S3_BUCKET}
