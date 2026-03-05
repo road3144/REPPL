@@ -248,3 +248,7 @@ logs/
 *.jks
 secrets/
 credentials/
+
+**/*claude*/**
+**/*CLAUDE*/**
+**/*CLAUDE*.*
