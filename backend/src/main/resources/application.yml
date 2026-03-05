@@ -13,7 +13,7 @@ spring:
     store-type: redis
     timeout: 86400s
 
-  # Kafka Consumer
+  # Kafka
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
@@ -21,10 +21,15 @@ spring:
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 # Kafka Topic
 kafka:
   topic:
+    job-request: reppl.job.request.v1
+    job-request.partitions: 3
     job-progress: vppl.job.progress.v1
     job-progress.partitions: 3
 
