@@ -3,6 +3,7 @@ package com.a401.reppl.controller;
 import com.a401.reppl.common.dto.ApiResponse;
 import com.a401.reppl.controller.dto.JobCreateRequest;
 import com.a401.reppl.controller.dto.JobCreateResponse;
+import com.a401.reppl.controller.dto.JobListResponse;
 import com.a401.reppl.service.JobService;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -10,9 +11,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
@@ -35,5 +38,19 @@ public class JobController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response));
+    }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<JobListResponse>> getJobs(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            HttpSession session) {
+
+        String sessionId = session.getId();
+        log.info("Get jobs request: sessionId={}, page={}, size={}", sessionId, page, size);
+
+        JobListResponse response = jobService.getJobs(sessionId, page, size);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
