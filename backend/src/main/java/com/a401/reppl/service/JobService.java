@@ -1,6 +1,8 @@
 package com.a401.reppl.service;
 
 import com.a401.reppl.controller.dto.JobCreateResponse;
+import com.a401.reppl.controller.dto.JobItemResponse;
+import com.a401.reppl.controller.dto.JobListResponse;
 import com.a401.reppl.domain.job.JobRedisRepository;
 import com.a401.reppl.domain.job.JobState;
 import com.a401.reppl.domain.job.JobStatus;
@@ -81,6 +83,30 @@ public class JobService {
         return JobCreateResponse.builder()
                 .jobId(jobId)
                 .status(JobStatus.QUEUED.name())
+                .build();
+    }
+
+    public JobListResponse getJobs(String sessionId, int page, int size) {
+        // 1. 세션의 Job ID 목록 조회 (페이지네이션)
+        List<String> jobIds = sessionRedisRepository.getJobs(sessionId, page, size);
+        long totalCount = sessionRedisRepository.getJobCount(sessionId);
+
+        // 2. 각 Job의 상태 조회
+        List<JobItemResponse> items = jobIds.stream()
+                .map(jobRedisRepository::findJobState)
+                .filter(opt -> opt.isPresent())
+                .map(opt -> JobItemResponse.from(opt.get()))
+                .collect(Collectors.toList());
+
+        // 3. 페이지 정보 계산
+        int totalPages = (int) Math.ceil((double) totalCount / size);
+
+        return JobListResponse.builder()
+                .items(items)
+                .page(page)
+                .size(size)
+                .totalCount(totalCount)
+                .totalPages(totalPages)
                 .build();
     }
 
