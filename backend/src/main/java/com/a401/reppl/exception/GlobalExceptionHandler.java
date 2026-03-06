@@ -16,6 +16,26 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(JobNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleJobNotFound(JobNotFoundException e) {
+        log.warn("Job not found: jobId={}", e.getJobId());
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error("JOB_NOT_FOUND", e.getMessage()));
+    }
+
+    @ExceptionHandler(JobNotCompletedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleJobNotCompleted(JobNotCompletedException e) {
+        log.warn("Job not completed: jobId={}, status={}", e.getJobId(), e.getStatus());
+
+        Map<String, Object> details = new HashMap<>();
+        details.put("jobId", e.getJobId());
+        details.put("currentStatus", e.getStatus());
+
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error("JOB_NOT_COMPLETED", e.getMessage(), details));
+    }
+
     @ExceptionHandler(InvalidKeySelectionException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidKeySelection(InvalidKeySelectionException e) {
         log.warn("Invalid key selection: videoKey={}, invalidImageKeys={}",
