@@ -3,11 +3,15 @@ package com.a401.reppl.service;
 import com.a401.reppl.controller.dto.JobCreateResponse;
 import com.a401.reppl.controller.dto.JobItemResponse;
 import com.a401.reppl.controller.dto.JobListResponse;
+import com.a401.reppl.controller.dto.JobResultResponse;
+import com.a401.reppl.controller.dto.JobStatusResponse;
 import com.a401.reppl.domain.job.JobRedisRepository;
 import com.a401.reppl.domain.job.JobState;
 import com.a401.reppl.domain.job.JobStatus;
 import com.a401.reppl.domain.session.SessionRedisRepository;
 import com.a401.reppl.exception.InvalidKeySelectionException;
+import com.a401.reppl.exception.JobNotCompletedException;
+import com.a401.reppl.exception.JobNotFoundException;
 import com.a401.reppl.kafka.JobRequestProducer;
 import com.a401.reppl.kafka.dto.JobRequestEvent;
 import com.a401.reppl.service.dto.JobCreateCommand;
@@ -35,6 +39,7 @@ public class JobService {
     private final JobRedisRepository jobRedisRepository;
     private final SessionRedisRepository sessionRedisRepository;
     private final JobRequestProducer jobRequestProducer;
+    private final S3Service s3Service;
     private final ObjectMapper objectMapper;
 
     @Value("${cloud.aws.s3.bucket}")
@@ -107,6 +112,37 @@ public class JobService {
                 .size(size)
                 .totalCount(totalCount)
                 .totalPages(totalPages)
+                .build();
+    }
+
+    public JobStatusResponse getJobStatus(String jobId) {
+        JobState state = jobRedisRepository.findJobState(jobId)
+                .orElseThrow(() -> new JobNotFoundException(jobId));
+
+        return JobStatusResponse.from(state);
+    }
+
+    public JobResultResponse getJobResult(String jobId) {
+        JobState state = jobRedisRepository.findJobState(jobId)
+                .orElseThrow(() -> new JobNotFoundException(jobId));
+
+        if (state.getStatus() != JobStatus.COMPLETED) {
+            throw new JobNotCompletedException(jobId, state.getStatus().name());
+        }
+
+        if (state.getResultKey() == null) {
+            throw new JobNotCompletedException(jobId, state.getStatus().name());
+        }
+
+        S3Service.PresignedDownload download = s3Service.generateDownloadUrl(state.getResultKey());
+
+        return JobResultResponse.builder()
+                .download(JobResultResponse.DownloadInfo.builder()
+                        .key(download.key())
+                        .url(download.url())
+                        .method(download.method())
+                        .expiresAt(download.expiresAt())
+                        .build())
                 .build();
     }
 
