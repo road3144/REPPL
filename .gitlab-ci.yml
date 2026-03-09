@@ -38,7 +38,7 @@ deploy:
     - docker push $BACKEND_IMAGE:latest
     - docker push $FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA
     - docker push $FRONTEND_IMAGE:latest
-    # .env 생성 및 배포
+    # 설정 파일 배포
     - mkdir -p ~/app/nginx
     - cp docker-compose.yml ~/app/docker-compose.yml
     - cp nginx/nginx.conf ~/app/nginx/nginx.conf
@@ -48,8 +48,12 @@ deploy:
         "$AWS_ACCESS_KEY" "$AWS_SECRET_KEY" "$AWS_REGION" "$AWS_S3_BUCKET" \
         > ~/app/.env
     - cd ~/app
-    - docker compose pull
-    - docker compose up -d --remove-orphans
+    # external 볼륨이 없으면 생성 (최초 배포 대응)
+    - docker volume create certbot_www 2>/dev/null || true
+    - docker volume create certbot_conf 2>/dev/null || true
+    # 변경된 서비스만 재시작 (인프라 컨테이너는 유지)
+    - docker compose pull backend frontend
+    - docker compose up -d --no-deps backend frontend nginx certbot
     # 이전 이미지 정리
     - docker image prune -af --filter "until=1h"
   rules:
