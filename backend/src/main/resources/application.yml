@@ -5,28 +5,33 @@ spring:
   # Redis
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
 
   # Spring Session (Redis)
   session:
     store-type: redis
-    timeout: 86400s
+    timeout: ${SESSION_TIMEOUT}
 
-  # Kafka Consumer
+  # Kafka
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     consumer:
-      group-id: ${KAFKA_CONSUMER_GROUP_ID:reppl-spring}
+      group-id: ${KAFKA_CONSUMER_GROUP_ID}
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
 # Kafka Topic
 kafka:
   topic:
-    job-progress: vppl.job.progress.v1
-    job-progress.partitions: 3
+    job-request: ${KAFKA_TOPIC_JOB_REQUEST}
+    job-request.partitions: ${KAFKA_TOPIC_JOB_REQUEST_PARTITIONS}
+    job-progress: ${KAFKA_TOPIC_JOB_PROGRESS}
+    job-progress.partitions: ${KAFKA_TOPIC_JOB_PROGRESS_PARTITIONS}
 
 # AWS S3
 cloud:
