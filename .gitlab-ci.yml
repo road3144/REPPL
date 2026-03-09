@@ -5,6 +5,7 @@ stages:
 variables:
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: "/certs"
+  REGISTRY_IMAGE: $DOCKER_HUB_USER/s14p21a401
 
 # ─── Build Backend ────────────────────────────────────────────────────────────
 build-backend:
@@ -13,15 +14,11 @@ build-backend:
   services:
     - docker:24-dind
   before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
   script:
-    - |
-      docker build \
-        -t $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA \
-        -t $CI_REGISTRY_IMAGE/backend:latest \
-        ./backend
-    - docker push $CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA
-    - docker push $CI_REGISTRY_IMAGE/backend:latest
+    - docker build -t $REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA -t $REGISTRY_IMAGE/backend:latest ./backend
+    - docker push $REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA
+    - docker push $REGISTRY_IMAGE/backend:latest
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
     - if: $CI_COMMIT_BRANCH == "dev"
@@ -33,15 +30,11 @@ build-frontend:
   services:
     - docker:24-dind
   before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
   script:
-    - |
-      docker build \
-        -t $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA \
-        -t $CI_REGISTRY_IMAGE/frontend:latest \
-        ./frontend
-    - docker push $CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA
-    - docker push $CI_REGISTRY_IMAGE/frontend:latest
+    - docker build -t $REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA -t $REGISTRY_IMAGE/frontend:latest ./frontend
+    - docker push $REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA
+    - docker push $REGISTRY_IMAGE/frontend:latest
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
     - if: $CI_COMMIT_BRANCH == "dev"
@@ -57,31 +50,16 @@ deploy:
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
   script:
-    # nginx 설정 디렉터리 준비
     - ssh ubuntu@$EC2_HOST "mkdir -p ~/app/nginx"
-
-    # 설정 파일 전송
     - scp docker-compose.yml ubuntu@$EC2_HOST:~/app/docker-compose.yml
     - scp nginx/nginx.conf ubuntu@$EC2_HOST:~/app/nginx/nginx.conf
-
-    # .env 작성 및 배포
     - |
-      ssh ubuntu@$EC2_HOST "
-        cd ~/app
-        cat > .env << 'ENVEOF'
-      REGISTRY_IMAGE=$CI_REGISTRY_IMAGE
-      TAG=$CI_COMMIT_SHORT_SHA
-      EC2_HOST=$EC2_HOST
-      AWS_ACCESS_KEY=$AWS_ACCESS_KEY
-      AWS_SECRET_KEY=$AWS_SECRET_KEY
-      AWS_REGION=$AWS_REGION
-      AWS_S3_BUCKET=$AWS_S3_BUCKET
-      ENVEOF
-        docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-        docker compose pull
-        docker compose up -d --remove-orphans
-        docker image prune -f
-      "
+      ssh ubuntu@$EC2_HOST "cd ~/app &&
+        printf 'REGISTRY_IMAGE=$REGISTRY_IMAGE\nTAG=$CI_COMMIT_SHORT_SHA\nEC2_HOST=$EC2_HOST\nAWS_ACCESS_KEY=$AWS_ACCESS_KEY\nAWS_SECRET_KEY=$AWS_SECRET_KEY\nAWS_REGION=$AWS_REGION\nAWS_S3_BUCKET=$AWS_S3_BUCKET\n' > .env &&
+        docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD &&
+        docker compose pull &&
+        docker compose up -d --remove-orphans &&
+        docker image prune -f"
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
   environment:
