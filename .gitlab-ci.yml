@@ -56,4 +56,4 @@ deploy:
     - if: $CI_COMMIT_BRANCH == "master"
   environment:
     name: production
-    url: http://$EC2_HOST
+    url: https://$EC2_HOST
