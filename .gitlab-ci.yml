@@ -54,22 +54,12 @@ deploy:
     - scp docker-compose.yml ubuntu@$EC2_HOST:~/app/docker-compose.yml
     - scp nginx/nginx.conf ubuntu@$EC2_HOST:~/app/nginx/nginx.conf
     - |
-      ssh ubuntu@$EC2_HOST "
-        cd ~/app
-        cat > .env << ENVEOF
-REGISTRY_IMAGE=$REGISTRY_IMAGE
-TAG=$CI_COMMIT_SHORT_SHA
-EC2_HOST=$EC2_HOST
-AWS_ACCESS_KEY=$AWS_ACCESS_KEY
-AWS_SECRET_KEY=$AWS_SECRET_KEY
-AWS_REGION=$AWS_REGION
-AWS_S3_BUCKET=$AWS_S3_BUCKET
-ENVEOF
-        docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
-        docker compose pull
-        docker compose up -d --remove-orphans
-        docker image prune -f
-      "
+      ssh ubuntu@$EC2_HOST "cd ~/app &&
+        printf 'REGISTRY_IMAGE=$REGISTRY_IMAGE\nTAG=$CI_COMMIT_SHORT_SHA\nEC2_HOST=$EC2_HOST\nAWS_ACCESS_KEY=$AWS_ACCESS_KEY\nAWS_SECRET_KEY=$AWS_SECRET_KEY\nAWS_REGION=$AWS_REGION\nAWS_S3_BUCKET=$AWS_S3_BUCKET\n' > .env &&
+        docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD &&
+        docker compose pull &&
+        docker compose up -d --remove-orphans &&
+        docker image prune -f"
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
   environment:
