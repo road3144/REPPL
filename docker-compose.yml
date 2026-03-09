@@ -112,4 +112,6 @@ volumes:
   kafka_data:
   zookeeper_data:
   certbot_www:
+    external: true
   certbot_conf:
+    external: true
