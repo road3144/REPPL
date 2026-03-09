@@ -3,16 +3,17 @@ stages:
   - deploy
 
 variables:
-  REGISTRY_IMAGE: $DOCKER_HUB_USER/s14p21a401
+  BACKEND_IMAGE: $DOCKER_HUB_USER/reppl-backend
+  FRONTEND_IMAGE: $DOCKER_HUB_USER/reppl-frontend
 
 # ─── Build Backend ────────────────────────────────────────────────────────────
 build-backend:
   stage: build
   script:
     - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
-    - docker build -t $REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA -t $REGISTRY_IMAGE/backend:latest ./backend
-    - docker push $REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA
-    - docker push $REGISTRY_IMAGE/backend:latest
+    - docker build -t $BACKEND_IMAGE:$CI_COMMIT_SHORT_SHA -t $BACKEND_IMAGE:latest ./backend
+    - docker push $BACKEND_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker push $BACKEND_IMAGE:latest
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
     - if: $CI_COMMIT_BRANCH == "dev"
@@ -22,9 +23,9 @@ build-frontend:
   stage: build
   script:
     - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
-    - docker build -t $REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA -t $REGISTRY_IMAGE/frontend:latest ./frontend
-    - docker push $REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA
-    - docker push $REGISTRY_IMAGE/frontend:latest
+    - docker build -t $FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA -t $FRONTEND_IMAGE:latest ./frontend
+    - docker push $FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker push $FRONTEND_IMAGE:latest
   rules:
     - if: $CI_COMMIT_BRANCH == "master"
     - if: $CI_COMMIT_BRANCH == "dev"
@@ -37,8 +38,8 @@ deploy:
     - cp docker-compose.yml ~/app/docker-compose.yml
     - cp nginx/nginx.conf ~/app/nginx/nginx.conf
     - |
-      printf 'REGISTRY_IMAGE=%s\nTAG=%s\nEC2_HOST=%s\nAWS_ACCESS_KEY=%s\nAWS_SECRET_KEY=%s\nAWS_REGION=%s\nAWS_S3_BUCKET=%s\n' \
-        "$REGISTRY_IMAGE" "$CI_COMMIT_SHORT_SHA" "$EC2_HOST" \
+      printf 'BACKEND_IMAGE=%s\nFRONTEND_IMAGE=%s\nTAG=%s\nEC2_HOST=%s\nAWS_ACCESS_KEY=%s\nAWS_SECRET_KEY=%s\nAWS_REGION=%s\nAWS_S3_BUCKET=%s\n' \
+        "$BACKEND_IMAGE" "$FRONTEND_IMAGE" "$CI_COMMIT_SHORT_SHA" "$EC2_HOST" \
         "$AWS_ACCESS_KEY" "$AWS_SECRET_KEY" "$AWS_REGION" "$AWS_S3_BUCKET" \
         > ~/app/.env
     - cd ~/app
