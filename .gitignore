@@ -252,3 +252,5 @@ credentials/
 **/*claude*/**
 **/*CLAUDE*/**
 **/*CLAUDE*.*
+
+docker-compose.local.yml
