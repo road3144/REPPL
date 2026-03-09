@@ -17,13 +17,13 @@ services:
 
   # ─── Frontend (React + Vite) ──────────────────────────────────
   frontend:
-    image: ${REGISTRY_IMAGE}/frontend:${TAG:-latest}
+    image: ${FRONTEND_IMAGE}:${TAG:-latest}
     container_name: frontend
     restart: unless-stopped
 
   # ─── Backend (Spring Boot) ────────────────────────────────────
   backend:
-    image: ${REGISTRY_IMAGE}/backend:${TAG:-latest}
+    image: ${BACKEND_IMAGE}:${TAG:-latest}
     container_name: backend
     environment:
       REDIS_HOST: redis
