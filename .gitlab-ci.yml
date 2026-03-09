@@ -12,6 +12,7 @@ build-backend:
   script:
     - docker build -t $BACKEND_IMAGE:$CI_COMMIT_SHORT_SHA ./backend
   rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "master"
     - if: $CI_COMMIT_BRANCH == "dev"
 
@@ -21,6 +22,7 @@ build-frontend:
   script:
     - docker build -t $FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA ./frontend
   rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "master"
     - if: $CI_COMMIT_BRANCH == "dev"
 
