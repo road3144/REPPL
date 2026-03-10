@@ -51,7 +51,9 @@ deploy:
     # external 볼륨이 없으면 생성 (최초 배포 대응)
     - docker volume create certbot_www 2>/dev/null || true
     - docker volume create certbot_conf 2>/dev/null || true
-    # 변경된 서비스만 재시작 (인프라 컨테이너는 유지)
+    # 인프라 컨테이너가 없으면 먼저 띄우기 (최초 배포 대응)
+    - docker compose up -d redis zookeeper kafka
+    # 앱 컨테이너만 업데이트 (redis, kafka, zookeeper는 유지)
     - docker compose pull backend frontend
     - docker compose up -d --no-deps backend frontend nginx certbot
     # 이전 이미지 정리
