@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { NavBar } from '../components/NavBar';
+import { useScrollReveal } from '../hooks/useScrollReveal';
 
 type Job = {
   id: number;
@@ -16,6 +17,7 @@ const statusStyle: Record<Job['status'], string> = {
 };
 
 export function DemoStudioPage() {
+  const pageRef = useScrollReveal<HTMLDivElement>();
   const [videoName, setVideoName] = useState('');
   const [brand, setBrand] = useState('');
   const [jobs, setJobs] = useState<Job[]>([
@@ -24,18 +26,22 @@ export function DemoStudioPage() {
   ]);
 
   const running = useMemo(() => jobs.filter((job) => job.status !== '완료').length, [jobs]);
+  const canSubmit = videoName.trim().length > 0 && brand.trim().length > 0;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!videoName || !brand) {
+    const trimmedVideoName = videoName.trim();
+    const trimmedBrand = brand.trim();
+
+    if (!trimmedVideoName || !trimmedBrand) {
       return;
     }
 
     const nextJob: Job = {
       id: Date.now(),
-      videoName,
-      brand,
+      videoName: trimmedVideoName,
+      brand: trimmedBrand,
       status: '분석중',
       eta: '약 30분'
     };
@@ -46,7 +52,7 @@ export function DemoStudioPage() {
   };
 
   return (
-    <div className="home-light min-h-screen text-slate-900">
+    <div className="home-light min-h-screen text-slate-900" ref={pageRef}>
       <NavBar />
       <main className="mx-auto max-w-6xl px-6 py-10">
         <section className="animate-on-scroll mb-6">
@@ -81,6 +87,8 @@ export function DemoStudioPage() {
                   value={videoName}
                   onChange={(e) => setVideoName(e.target.value)}
                   placeholder="ex) creator_vlog_032.mp4"
+                  autoComplete="off"
+                  required
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none ring-sky-400 transition focus:ring"
                 />
               </label>
@@ -91,6 +99,8 @@ export function DemoStudioPage() {
                   value={brand}
                   onChange={(e) => setBrand(e.target.value)}
                   placeholder="ex) Pepsi Zero Can"
+                  autoComplete="off"
+                  required
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none ring-sky-400 transition focus:ring"
                 />
               </label>
@@ -98,7 +108,8 @@ export function DemoStudioPage() {
 
             <button
               type="submit"
-              className="mt-6 w-full rounded-xl bg-sky-500 px-4 py-3 font-black text-white transition hover:bg-sky-600"
+              disabled={!canSubmit}
+              className="mt-6 w-full rounded-xl bg-sky-500 px-4 py-3 font-black text-white transition enabled:hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-sky-300"
             >
               분석 큐에 작업 추가
             </button>
@@ -106,7 +117,7 @@ export function DemoStudioPage() {
 
           <section className="light-slide-card">
             <h2 className="text-2xl font-black text-slate-900">작업 현황</h2>
-            <div className="mt-5 space-y-3">
+            <div className="mt-5 space-y-3" aria-live="polite">
               {jobs.map((job) => (
                 <article key={job.id} className="rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">

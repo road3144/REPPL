@@ -15,6 +15,10 @@ html {
   scroll-behavior: smooth;
 }
 
+[id] {
+  scroll-margin-top: 5.5rem;
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -145,6 +149,23 @@ body::before {
 .animate-on-scroll.delay-3 { transition-delay: 0.3s; }
 .animate-on-scroll.delay-4 { transition-delay: 0.4s; }
 .animate-on-scroll.delay-5 { transition-delay: 0.5s; }
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-on-scroll {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .float-anim,
+  .pulse-glow {
+    animation: none;
+  }
+}
 
 /* ─── Hero Specific ─── */
 .hero-section {

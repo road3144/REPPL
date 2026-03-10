@@ -1,25 +1,6 @@
-import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { NavBar } from '../components/NavBar';
-
-function useScrollReveal() {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) entry.target.classList.add('visible');
-        });
-      },
-      { threshold: 0.12 }
-    );
-    el.querySelectorAll('.animate-on-scroll').forEach((child) => observer.observe(child));
-    return () => observer.disconnect();
-  }, []);
-  return ref;
-}
+import { useScrollReveal } from '../hooks/useScrollReveal';
 
 const slides = [
   {
@@ -35,7 +16,7 @@ const slides = [
 ];
 
 export function HomePage() {
-  const mainRef = useScrollReveal();
+  const mainRef = useScrollReveal<HTMLDivElement>();
   const ctaLink = '/studio';
   const ctaLabel = '바로 작업 시작';
 
@@ -81,7 +62,12 @@ export function HomePage() {
             <div key={slide.title} className={`animate-on-scroll ${idx > 0 ? 'delay-1' : ''} light-slide-card`}>
               <div className="grid items-center gap-6 lg:grid-cols-[1.2fr_1fr]">
                 <div className="img-showcase !border-slate-200 !rounded-2xl">
-                  <img src={slide.image} alt={slide.title} />
+                  <img
+                    src={slide.image}
+                    alt={slide.title}
+                    loading={idx === 0 ? 'eager' : 'lazy'}
+                    decoding="async"
+                  />
                 </div>
                 <div>
                   <h2 className="text-3xl font-bold text-slate-900">{slide.title}</h2>
