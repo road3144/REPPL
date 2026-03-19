@@ -132,7 +132,7 @@ export async function getImageUploadUrls(refImages: Array<{
 export async function createJob(payload: {
   videoKey: string;
   refImageKeys: string[];
-  options: { brand: string };
+  options: { placementPrompt: string };
 }): Promise<JobCreateResponse> {
   return apiFetch<JobCreateResponse>('/api/v1/jobs', {
     method: 'POST',
