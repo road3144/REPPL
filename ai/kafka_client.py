@@ -7,7 +7,8 @@ from kafka import KafkaConsumer, KafkaProducer
 from config import (
     KAFKA_BOOTSTRAP_SERVERS,
     KAFKA_CONSUMER_GROUP_ID,
-    KAFKA_TOPIC_JOB_REQUEST,
+    KAFKA_TOPIC_JOB_PREVIEW,
+    KAFKA_TOPIC_JOB_COMPOSITE,
     KAFKA_TOPIC_JOB_PROGRESS,
 )
 
@@ -15,11 +16,12 @@ log = logging.getLogger(__name__)
 
 
 class KafkaJobConsumer:
-    """reppl.job.request.v1 토픽에서 작업 요청을 소비한다."""
+    """프리뷰 + 합성 두 토픽에서 작업 요청을 소비한다."""
 
     def __init__(self):
+        self._topics = [KAFKA_TOPIC_JOB_PREVIEW, KAFKA_TOPIC_JOB_COMPOSITE]
         self._consumer = KafkaConsumer(
-            KAFKA_TOPIC_JOB_REQUEST,
+            *self._topics,
             bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS.split(","),
             group_id=KAFKA_CONSUMER_GROUP_ID,
             auto_offset_reset="latest",
@@ -27,14 +29,14 @@ class KafkaJobConsumer:
             value_deserializer=lambda v: json.loads(v.decode("utf-8")),
         )
         log.info(
-            f"Kafka consumer started: topic={KAFKA_TOPIC_JOB_REQUEST}, "
+            f"Kafka consumer started: topics={self._topics}, "
             f"group={KAFKA_CONSUMER_GROUP_ID}, servers={KAFKA_BOOTSTRAP_SERVERS}"
         )
 
     def poll(self):
-        """메시지를 하나씩 yield 한다."""
+        """메시지를 (topic, value) 튜플로 yield 한다."""
         for message in self._consumer:
-            yield message.value
+            yield message.topic, message.value
 
     def close(self):
         self._consumer.close()
@@ -60,6 +62,7 @@ class KafkaProgressProducer:
         percent: int,
         message: str,
         output_key: str = None,
+        preview_keys: list = None,
     ):
         self._seq += 1
         event = {
@@ -72,6 +75,7 @@ class KafkaProgressProducer:
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "seq": self._seq,
             "outputKey": output_key,
+            "previewKeys": preview_keys,
         }
         self._producer.send(KAFKA_TOPIC_JOB_PROGRESS, key=job_id, value=event)
         self._producer.flush()

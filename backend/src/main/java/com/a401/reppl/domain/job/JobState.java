@@ -45,11 +45,17 @@ public class JobState {
     private JobStage stage;
     private String message;
 
+    // Job 타입 (PREVIEW / COMPOSITE)
+    private String jobType;
+
     // 입력 파일
     private String videoKey;
     private List<String> refImageKeys;
 
-    // 결과 파일 (완료 시)
+    // 프리뷰 이미지 (프리뷰 Job 완료 시)
+    private List<String> previewKeys;
+
+    // 결과 파일 (합성 Job 완료 시)
     private String resultKey;
 
     // ROI 정보 (JSON 문자열로 저장)

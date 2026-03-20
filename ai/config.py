@@ -13,7 +13,8 @@ if os.path.isfile(_ENV_FILE):
 # Kafka
 KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:29092")
 KAFKA_CONSUMER_GROUP_ID = os.environ.get("KAFKA_CONSUMER_GROUP_ID", "reppl-gpu")
-KAFKA_TOPIC_JOB_REQUEST = os.environ.get("KAFKA_TOPIC_JOB_REQUEST", "reppl.job.request.v1")
+KAFKA_TOPIC_JOB_PREVIEW = os.environ.get("KAFKA_TOPIC_JOB_PREVIEW", "reppl.job.preview.v1")
+KAFKA_TOPIC_JOB_COMPOSITE = os.environ.get("KAFKA_TOPIC_JOB_COMPOSITE", "reppl.job.composite.v1")
 KAFKA_TOPIC_JOB_PROGRESS = os.environ.get("KAFKA_TOPIC_JOB_PROGRESS", "reppl.job.progress.v1")
 
 # GMS API

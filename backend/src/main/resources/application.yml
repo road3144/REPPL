@@ -28,8 +28,10 @@ spring:
 # Kafka Topic
 kafka:
   topic:
-    job-request: ${KAFKA_TOPIC_JOB_REQUEST}
-    job-request.partitions: ${KAFKA_TOPIC_JOB_REQUEST_PARTITIONS}
+    job-preview: ${KAFKA_TOPIC_JOB_PREVIEW:reppl.job.preview.v1}
+    job-preview.partitions: ${KAFKA_TOPIC_JOB_PREVIEW_PARTITIONS:4}
+    job-composite: ${KAFKA_TOPIC_JOB_COMPOSITE:reppl.job.composite.v1}
+    job-composite.partitions: ${KAFKA_TOPIC_JOB_COMPOSITE_PARTITIONS:4}
     job-progress: ${KAFKA_TOPIC_JOB_PROGRESS}
     job-progress.partitions: ${KAFKA_TOPIC_JOB_PROGRESS_PARTITIONS}
 
