@@ -1,12 +1,19 @@
 """
-영상 이미지 합성 파이프라인 v3
-================================
-Grounding DINO + SAM 강제 파이프라인. 폴백 없음.
+영상 이미지 합성 파이프라인 v3 + Gemini API 연동
+=================================================
+Grounding DINO + SAM 강제 파이프라인 + Gemini 2.5 Flash Image API.
+
+사용법:
+  1) inputs/ 폴더에 영상(.mp4)과 합성할 이미지(.png/.jpg)를 넣는다.
+  2) python main.py 실행
+  3) 프롬프트 입력 (예: "책상 위 빈 공간에 콜라를 합성해줘")
+  4) 자동으로 Gemini API 호출 → changed_first_frame 생성 → 합성 완료
 
 필수 라이브러리:
   pip install opencv-python numpy torch torchvision
   pip install groundingdino-py
   pip install segment-anything   (또는 pip install sam-2)
+  pip install requests python-dotenv
 """
 
 import cv2
@@ -15,6 +22,12 @@ import os
 import re
 import sys
 import logging
+import base64
+import json
+import requests
+import glob
+from io import BytesIO
+from PIL import Image as PILImage
 
 try:
     if hasattr(sys.stdin, "reconfigure"):
@@ -26,6 +39,17 @@ except Exception:
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
+
+# ── .env 로드 ──
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+except ImportError:
+    pass  # dotenv 없으면 환경변수에서 직접 읽기
+
+GMS_API_KEY = os.environ.get("GMS_API_KEY", "")
+GMS_BASE = "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta/models/"
+GEMINI_URL = GMS_BASE + "gemini-2.5-flash-image:generateContent"
 
 # ── 필수 임포트 ──
 import torch
@@ -197,14 +221,20 @@ def _largest_cc(mask):
 
 
 # ══════════════════════════════════════════════════════════════
-# STEP 1 — 프롬프트
+# STEP 1 — 프롬프트 (간소화)
 # ══════════════════════════════════════════════════════════════
 def step1_prompt():
+    """
+    사용자에게 한국어 프롬프트만 입력받는다.
+    예: "책상 위 빈 공간에 콜라를 합성해줘"
+    """
     print("=" * 55)
-    print("  영상 합성 AI  (Grounding DINO + SAM)")
+    print("  영상 합성 AI  (Gemini + DINO + SAM)")
     print("=" * 55)
-    print("  inputs/ 폴더에 영상·이미지를 넣고 프롬프트를 입력하세요.")
-    print("  예) test_video.mp4 coca cola can")
+    print("  inputs/ 폴더에 영상(.mp4)과 합성할 이미지를 넣고")
+    print("  원하는 내용을 입력하세요.")
+    print()
+    print("  예) 책상 위 빈 공간에 콜라를 합성해줘")
     print()
     try:
         p = input("프롬프트: ").strip()
@@ -224,52 +254,208 @@ def step1_prompt():
 
 
 # ══════════════════════════════════════════════════════════════
-# STEP 2 — 파싱
+# STEP 2 — 자동 파일 탐색 + 키워드 추출
 # ══════════════════════════════════════════════════════════════
-_KO_EN = {
-    "코카콜라": "coca cola can", "콜라": "cola can",
-    "시계": "wall clock", "물병": "water bottle",
-    "커피": "coffee cup", "맥주": "beer can",
-    "합성해줘": "", "합성": "", "빈 공간에": "", "책상 위": "",
-    "의": "", "를": "", "을": "", "에": "",
-}
+def step2_auto_detect(user_prompt):
+    """
+    inputs/ 폴더에서 영상과 합성할 이미지를 자동 탐색하고,
+    사용자 프롬프트에서 DINO 키워드를 추출한다.
 
+    반환: (video_path, object_image_path, dino_keyword)
+    """
+    # 영상 파일 탐색
+    video_exts = ("*.mp4", "*.avi", "*.mov", "*.mkv")
+    videos = []
+    for ext in video_exts:
+        videos.extend(glob.glob(os.path.join(INPUTS, ext)))
+    if not videos:
+        raise FileNotFoundError(f"inputs/ 폴더에 영상 파일이 없습니다: {INPUTS}")
+    vpath = videos[0]  # 첫 번째 영상 사용
+    log.info(f"영상 발견: {os.path.basename(vpath)}")
 
-def step2_parse(prompt):
-    m = re.search(r'([\w\-./\\]+\.(?:mp4|avi|mov|mkv))', prompt, re.I)
-    if not m:
-        raise ValueError("영상 파일명을 찾을 수 없습니다")
+    # 합성할 이미지 탐색 (영상의 첫 프레임이 아닌 별도 이미지)
+    img_exts = ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.webp")
+    images = []
+    for ext in img_exts:
+        images.extend(glob.glob(os.path.join(INPUTS, ext)))
 
-    vname = m.group(1)
-    vpath = os.path.join(INPUTS, vname) if not os.path.isabs(vname) else vname
-    if not os.path.isfile(vpath):
-        raise FileNotFoundError(f"영상 없음: {vpath}")
+    # first_frame, changed_first_frame 등 파이프라인 생성 파일은 제외
+    skip_stems = {"first_frame", "changed_first_frame", "ref_depth_map", "create_gemini"}
+    obj_images = [
+        p for p in images
+        if os.path.splitext(os.path.basename(p))[0].lower() not in skip_stems
+    ]
 
-    rest = (prompt[:m.start()] + prompt[m.end():]).strip()
+    if not obj_images:
+        raise FileNotFoundError(
+            f"inputs/ 폴더에 합성할 이미지가 없습니다.\n"
+            f"  영상과 함께 합성할 객체 이미지(.png/.jpg)를 넣어주세요."
+        )
+    obj_img_path = obj_images[0]
+    log.info(f"합성 이미지 발견: {os.path.basename(obj_img_path)}")
+
+    # DINO 키워드 추출 (이미지 파일명에서 추출 시도 → 실패 시 "object")
+    stem = os.path.splitext(os.path.basename(obj_img_path))[0]
+    # 파일명에서 숫자/특수문자 제거하고 키워드화
+    kw_from_file = re.sub(r'[_\-\d]+', ' ', stem).strip()
+
+    # 한국어 → 영어 매핑 (사용자 프롬프트에서도 추출 시도)
+    _KO_EN = {
+        "코카콜라": "coca cola can", "콜라": "cola can", "콜라캔": "cola can",
+        "사과": "apple", "사과주스": "apple juice can", "에이드": "ade can",
+        "음료": "beverage can", "캔": "can", "병": "bottle",
+        "시계": "wall clock", "물병": "water bottle",
+        "커피": "coffee cup", "맥주": "beer can",
+        "컵": "cup", "접시": "plate", "꽃병": "vase",
+    }
+
+    kw = ""
     for ko, en in _KO_EN.items():
-        rest = rest.replace(ko, en)
-    kw = rest.strip() or "object"
+        if ko in user_prompt:
+            kw = en
+            break
 
-    log.info(f"영상: {os.path.basename(vpath)}  키워드: '{kw}'")
-    return vpath, kw
+    if not kw:
+        kw = kw_from_file if kw_from_file else "object"
+
+    log.info(f"DINO 키워드: '{kw}'")
+    return vpath, obj_img_path, kw
 
 
-# ══════════════════════════════════════════════════════════════
-# STEP 3 — Gemini 목업
-# ══════════════════════════════════════════════════════════════
-def step3_gemini(video_path, prompt):
+# ======================================================================
+# STEP 3 — Gemini API 호출 (changed_first_frame.png 생성)
+# ======================================================================
+def _cv2_to_base64_jpeg(img, quality=85, max_side=1024):
+    """OpenCV 이미지를 축소+JPEG 압축하여 base64로 변환."""
+    h, w = img.shape[:2]
+    if max(h, w) > max_side:
+        scale = max_side / max(h, w)
+        img = cv2.resize(img, (int(w * scale), int(h * scale)),
+                         interpolation=cv2.INTER_AREA)
+    _, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    return base64.standard_b64encode(buf.tobytes()).decode("utf-8")
+
+
+def _file_to_base64_jpeg(path, quality=85, max_side=512):
+    """파일에서 이미지 읽어 base64 JPEG (알파채널 흰배경 합성)."""
+    img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    if img is None:
+        raise IOError(f"이미지 로드 실패: {path}")
+    if img.ndim == 3 and img.shape[2] == 4:
+        alpha = img[:, :, 3:4].astype(np.float32) / 255.0
+        rgb = img[:, :, :3].astype(np.float32)
+        white = np.full_like(rgb, 255.0)
+        img = (rgb * alpha + white * (1.0 - alpha)).astype(np.uint8)
+    elif img.ndim == 2:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    return _cv2_to_base64_jpeg(img, quality, max_side)
+
+
+def step3_gemini(video_path, obj_img_path, kw):
+    """
+    Gemini API 호출 → changed_first_frame.png 직접 저장 → (f1, f2) 반환.
+    """
     cap = cv2.VideoCapture(video_path)
     ret, f1 = cap.read()
     cap.release()
     if not ret:
         raise IOError("첫 프레임 읽기 실패")
 
-    gpath = _find_image("changed_first_frame")
-    f2 = cv2.imread(gpath)
-    if f2 is None:
-        raise IOError(f"합성 프레임 로드 실패: {gpath}")
+    h1, w1 = f1.shape[:2]
+    first_frame_path = os.path.join(INPUTS, "first_frame.png")
+    cv2.imwrite(first_frame_path, f1)
 
-    log.info(f"원본 {f1.shape[1]}×{f1.shape[0]}  생성 {f2.shape[1]}×{f2.shape[0]}")
+    changed_path = os.path.join(INPUTS, "changed_first_frame.png")
+
+    # 기존 changed_first_frame 재사용
+    if os.path.isfile(changed_path):
+        f2 = cv2.imread(changed_path)
+        if f2 is not None and f2.mean() > 10:
+            log.info("기존 changed_first_frame 재사용")
+            return f1, f2
+        elif f2 is not None:
+            os.remove(changed_path)
+
+    if not GMS_API_KEY:
+        raise RuntimeError("GMS_API_KEY 미설정")
+
+    # ── Gemini 프롬프트 ──
+    gemini_prompt = (
+        f"I am giving you two images. "
+        f"Image 1 is a {w1}x{h1} LANDSCAPE photo (wider than tall). "
+        f"Image 2 is the object to add (a {kw}). "
+        f"YOUR TASK: Output a new LANDSCAPE image that is identical to Image 1, "
+        f"but with the {kw} from Image 2 placed on the empty area of the table/desk. "
+        f"CRITICAL: The output MUST be LANDSCAPE orientation (wider than tall), "
+        f"exactly matching Image 1\'s layout. "
+        f"DO NOT rotate, crop, or change the orientation to portrait. "
+        f"DO NOT change any existing objects, people, or background elements. "
+        f"Only ADD the {kw} with a realistic shadow."
+    )
+
+    first_b64 = _cv2_to_base64_jpeg(f1, quality=90, max_side=1280)
+    obj_b64 = _file_to_base64_jpeg(obj_img_path, quality=90, max_side=512)
+    log.info(f"API 페이로드: 배경 {len(first_b64)//1024}KB, 객체 {len(obj_b64)//1024}KB")
+
+    payload = {
+        "contents": [{"parts": [
+            {"text": gemini_prompt},
+            {"inline_data": {"mime_type": "image/jpeg", "data": first_b64}},
+            {"inline_data": {"mime_type": "image/jpeg", "data": obj_b64}}
+        ]}],
+        "generationConfig": {
+            "responseModalities": ["TEXT", "IMAGE"],
+            "imageConfig": {"aspectRatio": "16:9"}
+        }
+    }
+    headers = {"x-goog-api-key": GMS_API_KEY, "Content-Type": "application/json"}
+
+    # create_gemini.png 캐시 (이전 버전 호환)
+    gemini_cache = os.path.join(INPUTS, "create_gemini.png")
+    f2 = None
+    if os.path.isfile(gemini_cache):
+        f2 = cv2.imread(gemini_cache)
+        if f2 is not None:
+            log.info(f"기존 create_gemini.png → changed_first_frame으로 재사용")
+
+    if f2 is None:
+        resp = None
+        for attempt in range(3):
+            log.info(f"Gemini API (시도 {attempt+1}/3)...")
+            try:
+                resp = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=180)
+                resp.raise_for_status()
+                log.info("API 성공!")
+                break
+            except requests.exceptions.RequestException as e:
+                err = resp.text[:300] if resp is not None else "없음"
+                log.warning(f"시도 {attempt+1} 실패: {err}")
+                resp = None
+                if attempt < 2:
+                    import time; time.sleep(3)
+        if resp is None:
+            raise RuntimeError("Gemini API 3회 실패")
+
+        result = resp.json()
+        generated_image = None
+        for cand in result.get("candidates", []):
+            for part in cand.get("content", {}).get("parts", []):
+                for key in ["inlineData", "inline_data"]:
+                    if key in part and "data" in part[key]:
+                        generated_image = base64.standard_b64decode(part[key]["data"])
+                        break
+                if generated_image: break
+            if generated_image: break
+        if not generated_image:
+            raise RuntimeError("Gemini 응답에 이미지 없음")
+
+        f2 = cv2.imdecode(np.frombuffer(generated_image, np.uint8), cv2.IMREAD_COLOR)
+        if f2 is None:
+            raise RuntimeError("이미지 디코딩 실패")
+
+    cv2.imwrite(changed_path, f2)
+    log.info(f"changed_first_frame 저장: {f2.shape[1]}x{f2.shape[0]}")
+
     return f1, f2
 
 
@@ -438,42 +624,136 @@ def _refine_mask(mask, frame, bbox):
 
 
 def extract_shadow_map(f1, f2, mask):
+    """
+    그림자 추출 (main_shadow.py 방식 적용).
+
+    3단계 교차 검증:
+    1) 밝기 비율 + Bottom-Anchored 타원형 공간 가중치
+    2) 빛 방향 추론 → 방향성 가중치
+    3) 연결성 + 형태(aspect ratio) 검증
+    """
     if f1.shape[:2] != f2.shape[:2]:
         f1 = cv2.resize(f1, (f2.shape[1], f2.shape[0]))
+
+    # ── 밝기 비율 계산 ──
     hsv1 = cv2.cvtColor(f1, cv2.COLOR_BGR2HSV).astype(np.float32)
     hsv2 = cv2.cvtColor(f2, cv2.COLOR_BGR2HSV).astype(np.float32)
     v1 = hsv1[:, :, 2]
     v2 = hsv2[:, :, 2]
-    
+
     v1_safe = np.clip(v1, 1e-5, 255.0)
     raw_ratio = v2 / v1_safe
-    
+
     kernel = np.ones((51, 51), np.uint8)
     dilated_mask = cv2.dilate(mask, kernel, iterations=2)
     bg_ratio = raw_ratio[dilated_mask == 0]
     base_ratio = np.median(bg_ratio) if len(bg_ratio) > 0 else 1.0
-    
+
     normalized_ratio = raw_ratio / base_ratio
-    shadow_map = np.clip(normalized_ratio, 0.0, 1.0)
-    
-    # ── 그림자 탐지 영역 완화 (부드럽고 넓은 그림자) ──
-    # 1) 객체 주변 80px(더 넓게) 그림자 탐지 영역으로 설정
-    shadow_zone = cv2.dilate(mask, np.ones((80, 80), np.uint8), iterations=1)
-    shadow_map[shadow_zone == 0] = 1.0
-    
-    # 2) 객체 내부는 그림자 아님
+    shadow_map_raw = np.clip(normalized_ratio, 0.0, 1.0)
+
+    # ═══════════════════════════════════════
+    # 1단계: Bottom-Anchored 타원형 공간 가중치
+    # (방향 무관 — 야외 12시 방향 그림자도 처리 가능)
+    # ═══════════════════════════════════════
+    y_coords, x_coords = np.where(mask > 0)
+    if len(y_coords) > 0:
+        min_y, max_y = int(np.min(y_coords)), int(np.max(y_coords))
+        min_x, max_x = int(np.min(x_coords)), int(np.max(x_coords))
+        cx = (min_x + max_x) // 2
+        cy = (min_y + max_y) // 2
+        obj_h = max_y - min_y
+        obj_w = max_x - min_x
+
+        # 앵커: 객체 하단 20% 지점 (접촉 그림자의 중심)
+        anchor_y = max_y - (obj_h * 0.2)
+        anchor_x = cx
+
+        H, W = mask.shape
+        Y, X = np.ogrid[:H, :W]
+        dist_x = (X - anchor_x) / (obj_w * 1.5 + 1e-5)
+        dist_y = (Y - anchor_y) / (obj_h * 0.8 + 1e-5)
+        ellipse_dist = np.sqrt(dist_x**2 + dist_y**2)
+        spatial_weight = np.clip(1.7 - ellipse_dist * 1.4, 0.0, 1.0)
+
+        # 상단 감쇠 (객체 위쪽으로 갈수록 그림자 약화)
+        up_penalty = np.clip((Y - min_y) / (cy - min_y + 1e-5), 0.0, 1.0)
+        up_penalty[Y >= cy] = 1.0
+
+        final_weight = spatial_weight * up_penalty
+        shadow_depth = 1.0 - shadow_map_raw
+        shadow_depth *= final_weight
+        shadow_map_raw = 1.0 - shadow_depth
+
+    shadow_map_raw[mask > 0] = 1.0
+    shadow_map_raw[shadow_map_raw > 0.95] = 1.0
+
+    # ═══════════════════════════════════════
+    # 2단계: 빛 방향 추론 → 방향성 가중치
+    # ═══════════════════════════════════════
+    shadow_binary = (shadow_map_raw < 0.95).astype(np.uint8) * 255
+
+    # 객체 근처의 그림자 overlap으로 빛 방향 추론
+    base_shadow_overlap = cv2.bitwise_and(
+        shadow_binary,
+        cv2.dilate(mask, np.ones((15, 15), np.uint8))
+    )
+    M_obj = cv2.moments(mask)
+    M_shd = cv2.moments(base_shadow_overlap)
+
+    if M_obj['m00'] > 0 and M_shd['m00'] > 0:
+        obj_cx = M_obj['m10'] / M_obj['m00']
+        obj_cy = M_obj['m01'] / M_obj['m00']
+        sx = M_shd['m10'] / M_shd['m00']
+        sy = M_shd['m01'] / M_shd['m00']
+
+        vx, vy = sx - obj_cx, sy - obj_cy
+        norm = np.hypot(vx, vy)
+
+        if norm > 5.0:
+            vx, vy = vx / norm, vy / norm
+            H, W = mask.shape
+            Y, X = np.ogrid[:H, :W]
+            dist = np.maximum(1e-5, np.hypot(X - obj_cx, Y - obj_cy))
+            dot_product = ((X - obj_cx) * vx + (Y - obj_cy) * vy) / dist
+            dir_weight = np.clip((dot_product + 0.3) / 0.7, 0.0, 1.0)
+
+            shadow_depth = 1.0 - shadow_map_raw
+            shadow_depth *= dir_weight
+            shadow_map_raw = 1.0 - shadow_depth
+            shadow_binary = (shadow_map_raw < 0.95).astype(np.uint8) * 255
+
+    # ═══════════════════════════════════════
+    # 3단계: 연결성 + 형태 검증
+    # (객체와 연결되고 종횡비가 합리적인 blob만 유지)
+    # ═══════════════════════════════════════
+    kernel_40 = np.ones((40, 40), np.uint8)
+    dilated_for_check = cv2.dilate(mask, kernel_40, iterations=1)
+
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+        shadow_binary, connectivity=8
+    )
+    valid_shadow = np.zeros_like(shadow_binary)
+    for label in range(1, num_labels):
+        blob = (labels == label).astype(np.uint8)
+        overlap = cv2.bitwise_and(blob, dilated_for_check)
+        area = stats[label, cv2.CC_STAT_AREA]
+        bw = stats[label, cv2.CC_STAT_WIDTH]
+        bh = stats[label, cv2.CC_STAT_HEIGHT]
+        aspect = max(bw / max(1, bh), bh / max(1, bw))
+
+        # 객체와 연결 + 최소 면적 + 합리적 종횡비
+        if cv2.countNonZero(overlap) > 0 and area > 150 and aspect < 6.0:
+            valid_shadow[blob == 1] = 255
+
+    # 검증된 그림자만 적용
+    shadow_map = np.where(valid_shadow == 255, shadow_map_raw, 1.0)
     shadow_map[mask > 0] = 1.0
-    
-    # 3) 마스크 경계 주변 임계값 완화
-    near_mask = cv2.dilate(mask, np.ones((20, 20), np.uint8), iterations=1)
-    near_border = (near_mask > 0) & (mask == 0)
-    shadow_map[near_border & (shadow_map > 0.88)] = 1.0
-    
-    # 4) 전체적으로 임계값 완화: 부드러운 그림자(Soft Shadow) 살림
-    shadow_map[shadow_map > 0.94] = 1.0
-    
-    shadow_map = cv2.GaussianBlur(shadow_map, (25, 25), 0)
-    log.info(f"AI 그림자 추출 완료 (base_ratio: {base_ratio:.3f})")
+    shadow_map = cv2.GaussianBlur(shadow_map, (15, 15), 0)
+    shadow_map = np.clip(shadow_map, 0.0, 1.0)
+
+    log.info(f"그림자 추출 완료 (base_ratio: {base_ratio:.3f}, "
+             f"검증된 그림자: {np.sum(valid_shadow > 0)}px)")
     return shadow_map
 
 def step4_extract(first_frame, generated_frame, keyword):
@@ -492,8 +772,9 @@ def step4_extract(first_frame, generated_frame, keyword):
 
     log.info(f"마스크 결합 완료: {len(all_bboxes)}개 객체")
 
-    # 그림자 추출 (결합된 마스크 기준)
-    shadow_map = extract_shadow_map(first_frame, generated_frame, combined_mask)
+    # 그림자 추출 (결합된 마스크 기준, 마스크를 약간 축소하여 경계 아티팩트 방지)
+    eroded_mask = cv2.erode(combined_mask, np.ones((5, 5), np.uint8), iterations=1)
+    shadow_map = extract_shadow_map(first_frame, generated_frame, eroded_mask)
 
     # bbox를 결합된 영역(마스크 + 그림자) 기준으로 재계산
     shadow_binary = (shadow_map < 0.98).astype(np.uint8) * 255
@@ -565,9 +846,9 @@ def step6_composite(vpath, obj, mr, sr, vbbox, opath):
     fg = obj[oy1:oy2, ox1:ox2].astype(np.float32)
     cm = mr[oy1:oy2, ox1:ox2]
 
-    # 소프트 알파 (외곽선을 부드럽게 풀기 위해 페더링 강화)
-    alpha = cv2.GaussianBlur(cm.astype(np.float32) / 255, (0, 0), sigmaX=3.5)
-    inner = cv2.erode(cm, np.ones((3, 3), np.uint8), iterations=1)
+    # 소프트 알파 (어두운 테두리 방지를 위해 좁은 페더링)
+    alpha = cv2.GaussianBlur(cm.astype(np.float32) / 255, (0, 0), sigmaX=1.5)
+    inner = cv2.erode(cm, np.ones((3, 3), np.uint8), iterations=2)
     alpha[inner > 0] = 1.0
     alpha = np.clip(alpha, 0, 1)
     a3 = np.stack([alpha] * 3, axis=-1)
@@ -656,24 +937,27 @@ def step6_composite(vpath, obj, mr, sr, vbbox, opath):
     out.release()
     log.info(f"완료: {n}f → {opath}")
 
-
 # ══════════════════════════════════════════════════════════════
 # 메인
 # ══════════════════════════════════════════════════════════════
 def main():
-    prompt = step1_prompt()
+    user_prompt = step1_prompt()
 
     log.info("─" * 45)
-    log.info("STEP 2 — 파싱")
+    log.info("STEP 2 — 자동 파일 탐색 + 키워드 추출")
     try:
-        vpath, kw = step2_parse(prompt)
-    except (ValueError, FileNotFoundError) as e:
+        vpath, obj_img_path, kw = step2_auto_detect(user_prompt)
+    except FileNotFoundError as e:
         print(f"❌ {e}")
         return
 
     log.info("─" * 45)
-    log.info("STEP 3 — Gemini")
-    f1, f2 = step3_gemini(vpath, prompt)
+    log.info("STEP 3 — Gemini API (changed_first_frame 생성)")
+    try:
+        f1, f2 = step3_gemini(vpath, obj_img_path, kw)
+    except RuntimeError as e:
+        print(f"❌ {e}")
+        return
 
     cap = cv2.VideoCapture(vpath)
     vw, vh = int(cap.get(3)), int(cap.get(4))
