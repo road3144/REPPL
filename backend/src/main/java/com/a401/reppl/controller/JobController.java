@@ -1,11 +1,14 @@
 package com.a401.reppl.controller;
 
 import com.a401.reppl.common.dto.ApiResponse;
-import com.a401.reppl.controller.dto.JobCreateRequest;
-import com.a401.reppl.controller.dto.JobCreateResponse;
 import com.a401.reppl.controller.dto.JobListResponse;
 import com.a401.reppl.controller.dto.JobResultResponse;
 import com.a401.reppl.controller.dto.JobStatusResponse;
+import com.a401.reppl.controller.dto.PreviewCreateRequest;
+import com.a401.reppl.controller.dto.PreviewCreateResponse;
+import com.a401.reppl.controller.dto.PreviewListResponse;
+import com.a401.reppl.controller.dto.PreviewSelectRequest;
+import com.a401.reppl.controller.dto.PreviewSelectResponse;
 import com.a401.reppl.service.JobService;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -28,20 +31,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobController {
 
     private final JobService jobService;
-
-    @PostMapping
-    public ResponseEntity<ApiResponse<JobCreateResponse>> createJob(
-            @Valid @RequestBody JobCreateRequest request,
-            HttpSession session) {
-
-        String sessionId = session.getId();
-        log.info("Create job request: sessionId={}, videoKey={}", sessionId, request.getVideoKey());
-
-        JobCreateResponse response = jobService.createJob(sessionId, request.toCommand());
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response));
-    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<JobListResponse>> getJobs(
@@ -77,5 +66,50 @@ public class JobController {
         JobResultResponse response = jobService.getJobResult(jobId);
 
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // 프리뷰 관련 엔드포인트
+    // ══════════════════════════════════════════════════════════
+
+    @PostMapping("/preview")
+    public ResponseEntity<ApiResponse<PreviewCreateResponse>> createPreviewJob(
+            @Valid @RequestBody PreviewCreateRequest request,
+            HttpSession session) {
+
+        String sessionId = session.getId();
+        log.info("Create preview job request: sessionId={}, videoKey={}", sessionId, request.getVideoKey());
+
+        PreviewCreateResponse response = jobService.createPreviewJob(sessionId, request);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{jobId}/previews")
+    public ResponseEntity<ApiResponse<PreviewListResponse>> getPreviewUrls(
+            @PathVariable String jobId) {
+
+        log.info("Get preview URLs request: jobId={}", jobId);
+
+        PreviewListResponse response = jobService.getPreviewUrls(jobId);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/{jobId}/select")
+    public ResponseEntity<ApiResponse<PreviewSelectResponse>> selectPreview(
+            @PathVariable String jobId,
+            @Valid @RequestBody PreviewSelectRequest request,
+            HttpSession session) {
+
+        String sessionId = session.getId();
+        log.info("Select preview request: jobId={}, selectedIndex={}", jobId, request.getSelectedIndex());
+
+        PreviewSelectResponse response = jobService.selectPreviewAndStartComposite(
+                sessionId, jobId, request.getSelectedIndex());
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response));
     }
 }

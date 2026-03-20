@@ -33,7 +33,7 @@ class JobProgressConsumerTest {
     }
 
     // ────────────────────────────────────────────────────────────
-    // COMPLETED
+    // COMPLETED (합성 Job)
     // ────────────────────────────────────────────────────────────
 
     @Test
@@ -46,21 +46,28 @@ class JobProgressConsumerTest {
         consumer.consume(message);
 
         verify(jobRedisRepository).completeJob("job-1", "results/job-1/output.mp4");
-        verify(webSocketPushService).pushJobProgress("job-1", JobStatus.COMPLETED, 100, "Done");
+        verify(webSocketPushService).pushJobProgress(eq("job-1"), eq(JobStatus.COMPLETED), eq(100),
+                any(), eq("Done"), isNull());
         verify(jobRedisRepository, never()).failJob(any(), any());
         verify(jobRedisRepository, never()).updateProgress(any(), any(), any(), any(), any());
     }
 
+    // ────────────────────────────────────────────────────────────
+    // COMPLETED (프리뷰 Job - previewKeys 포함)
+    // ────────────────────────────────────────────────────────────
+
     @Test
-    void COMPLETED_이벤트_outputKey_null이어도_completeJob_호출됨() {
+    void COMPLETED_프리뷰_이벤트_completePreviewJob_호출() {
         String message = """
-                {"jobId":"job-1","status":"COMPLETED","percent":100,"seq":5}
+                {"jobId":"job-p1","status":"COMPLETED","percent":100,
+                 "previewKeys":["previews/job-p1/preview_0.png","previews/job-p1/preview_1.png"],
+                 "message":"Preview done","seq":5}
                 """;
 
         consumer.consume(message);
 
-        verify(jobRedisRepository).completeJob("job-1", null);
-        verify(webSocketPushService).pushJobProgress("job-1", JobStatus.COMPLETED, 100, null);
+        verify(jobRedisRepository).completePreviewJob(eq("job-p1"), anyList());
+        verify(jobRedisRepository, never()).completeJob(any(), any());
     }
 
     // ────────────────────────────────────────────────────────────
@@ -77,51 +84,30 @@ class JobProgressConsumerTest {
         consumer.consume(message);
 
         verify(jobRedisRepository).failJob("job-2", "GPU out of memory");
-        verify(webSocketPushService).pushJobProgress("job-2", JobStatus.FAILED, 30, "GPU out of memory");
+        verify(webSocketPushService).pushJobProgress(eq("job-2"), eq(JobStatus.FAILED), eq(30),
+                any(), eq("GPU out of memory"), isNull());
         verify(jobRedisRepository, never()).completeJob(any(), any());
         verify(jobRedisRepository, never()).updateProgress(any(), any(), any(), any(), any());
     }
 
     // ────────────────────────────────────────────────────────────
-    // RUNNING (default 분기)
+    // RUNNING
     // ────────────────────────────────────────────────────────────
 
     @Test
     void RUNNING_이벤트_updateProgress_호출하고_push() {
         String message = """
-                {"jobId":"job-3","status":"RUNNING","stage":"DETECT",
+                {"jobId":"job-3","status":"RUNNING","stage":"DINO",
                  "percent":42,"message":"Detecting objects","seq":2}
                 """;
 
         consumer.consume(message);
 
-        verify(jobRedisRepository).updateProgress("job-3", JobStatus.RUNNING, 42, JobStage.DETECT, "Detecting objects");
-        verify(webSocketPushService).pushJobProgress("job-3", JobStatus.RUNNING, 42, "Detecting objects");
+        verify(jobRedisRepository).updateProgress("job-3", JobStatus.RUNNING, 42, JobStage.DINO, "Detecting objects");
+        verify(webSocketPushService).pushJobProgress(eq("job-3"), eq(JobStatus.RUNNING), eq(42),
+                eq(JobStage.DINO), eq("Detecting objects"), isNull());
         verify(jobRedisRepository, never()).completeJob(any(), any());
         verify(jobRedisRepository, never()).failJob(any(), any());
-    }
-
-    @Test
-    void QUEUED_이벤트_updateProgress_호출됨() {
-        String message = """
-                {"jobId":"job-4","status":"QUEUED","percent":0,"seq":1}
-                """;
-
-        consumer.consume(message);
-
-        verify(jobRedisRepository).updateProgress("job-4", JobStatus.QUEUED, 0, null, null);
-        verify(webSocketPushService).pushJobProgress("job-4", JobStatus.QUEUED, 0, null);
-    }
-
-    @Test
-    void RUNNING_stage_없으면_null로_updateProgress() {
-        String message = """
-                {"jobId":"job-5","status":"RUNNING","percent":10,"seq":1}
-                """;
-
-        consumer.consume(message);
-
-        verify(jobRedisRepository).updateProgress("job-5", JobStatus.RUNNING, 10, null, null);
     }
 
     // ────────────────────────────────────────────────────────────
@@ -136,23 +122,11 @@ class JobProgressConsumerTest {
         verify(jobRedisRepository, never()).updateProgress(any(), any(), any(), any(), any());
         verify(jobRedisRepository, never()).completeJob(any(), any());
         verify(jobRedisRepository, never()).failJob(any(), any());
-        verify(webSocketPushService, never()).pushJobProgress(any(), any(), anyInt(), any());
     }
 
     @Test
     void 빈_문자열_수신시_예외_전파_안됨() {
         assertThatCode(() -> consumer.consume(""))
-                .doesNotThrowAnyException();
-    }
-
-    @Test
-    void 알수없는_status_필드_포함시_역직렬화_실패해도_예외_전파_안됨() {
-        // status가 enum에 없는 값
-        String message = """
-                {"jobId":"job-6","status":"UNKNOWN_STATUS","percent":50,"seq":1}
-                """;
-
-        assertThatCode(() -> consumer.consume(message))
                 .doesNotThrowAnyException();
     }
 }

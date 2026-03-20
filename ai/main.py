@@ -983,5 +983,164 @@ def main():
     print("=" * 55)
 
 
+def _call_gemini_once(first_b64, obj_b64, kw, w1, h1):
+    """Gemini API를 1회 호출하여 합성 이미지(cv2 ndarray)를 반환한다."""
+    gemini_prompt = (
+        f"I am giving you two images. "
+        f"Image 1 is a {w1}x{h1} LANDSCAPE photo (wider than tall). "
+        f"Image 2 is the object to add (a {kw}). "
+        f"YOUR TASK: Output a new LANDSCAPE image that is identical to Image 1, "
+        f"but with the {kw} from Image 2 placed on the empty area of the table/desk. "
+        f"CRITICAL: The output MUST be LANDSCAPE orientation (wider than tall), "
+        f"exactly matching Image 1's layout. "
+        f"DO NOT rotate, crop, or change the orientation to portrait. "
+        f"DO NOT change any existing objects, people, or background elements. "
+        f"Only ADD the {kw} with a realistic shadow."
+    )
+
+    payload = {
+        "contents": [{"parts": [
+            {"text": gemini_prompt},
+            {"inline_data": {"mime_type": "image/jpeg", "data": first_b64}},
+            {"inline_data": {"mime_type": "image/jpeg", "data": obj_b64}}
+        ]}],
+        "generationConfig": {
+            "responseModalities": ["TEXT", "IMAGE"],
+            "imageConfig": {"aspectRatio": "16:9"}
+        }
+    }
+    headers = {"x-goog-api-key": GMS_API_KEY, "Content-Type": "application/json"}
+
+    resp = None
+    for attempt in range(3):
+        log.info(f"Gemini API (시도 {attempt+1}/3)...")
+        try:
+            resp = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=180)
+            resp.raise_for_status()
+            break
+        except requests.exceptions.RequestException as e:
+            err = resp.text[:300] if resp is not None else "없음"
+            log.warning(f"시도 {attempt+1} 실패: {err}")
+            resp = None
+            if attempt < 2:
+                import time; time.sleep(3)
+    if resp is None:
+        raise RuntimeError("Gemini API 3회 실패")
+
+    result = resp.json()
+    generated_image = None
+    for cand in result.get("candidates", []):
+        for part in cand.get("content", {}).get("parts", []):
+            for key in ["inlineData", "inline_data"]:
+                if key in part and "data" in part[key]:
+                    generated_image = base64.standard_b64decode(part[key]["data"])
+                    break
+            if generated_image: break
+        if generated_image: break
+    if not generated_image:
+        raise RuntimeError("Gemini 응답에 이미지 없음")
+
+    img = cv2.imdecode(np.frombuffer(generated_image, np.uint8), cv2.IMREAD_COLOR)
+    if img is None:
+        raise RuntimeError("이미지 디코딩 실패")
+    return img
+
+
+def generate_previews(video_path, obj_img_path, user_prompt, count=3, on_progress=None):
+    """
+    Gemini를 count회 호출하여 프리뷰 이미지 리스트를 반환한다.
+
+    Args:
+        video_path: 영상 파일 경로
+        obj_img_path: 합성할 객체 이미지 경로
+        user_prompt: 사용자 프롬프트
+        count: 생성할 프리뷰 개수 (기본 3)
+        on_progress: 진행률 콜백 (stage, percent, message)
+
+    Returns:
+        list[str]: 저장된 프리뷰 이미지 경로 리스트
+    """
+    def _p(stage, percent, message):
+        if on_progress:
+            on_progress(stage, percent, message)
+
+    if not GMS_API_KEY:
+        raise RuntimeError("GMS_API_KEY 미설정")
+
+    # 키워드 추출
+    _, _, kw = step2_auto_detect(user_prompt)
+
+    # 첫 프레임 추출
+    cap = cv2.VideoCapture(video_path)
+    ret, f1 = cap.read()
+    cap.release()
+    if not ret:
+        raise IOError("첫 프레임 읽기 실패")
+
+    h1, w1 = f1.shape[:2]
+    first_b64 = _cv2_to_base64_jpeg(f1, quality=90, max_side=1280)
+    obj_b64 = _file_to_base64_jpeg(obj_img_path, quality=90, max_side=512)
+
+    preview_paths = []
+    for i in range(count):
+        pct = int(10 + (80 * i / count))
+        _p("GEMINI", pct, f"Gemini 모델이 프리뷰 이미지를 생성하는 중입니다... ({i+1}/{count})")
+
+        img = _call_gemini_once(first_b64, obj_b64, kw, w1, h1)
+        path = os.path.join(OUTPUTS, f"preview_{i}.png")
+        cv2.imwrite(path, img)
+        preview_paths.append(path)
+        log.info(f"프리뷰 {i+1}/{count} 생성 완료: {img.shape[1]}x{img.shape[0]}")
+
+    _p("GEMINI", 90, "프리뷰 이미지 생성 완료")
+    return preview_paths
+
+
+def run_composite(video_path, selected_preview_path, user_prompt, output_path, on_progress=None):
+    """
+    선택된 프리뷰 이미지를 기반으로 합성 파이프라인을 실행한다.
+
+    Args:
+        video_path: 원본 영상 경로
+        selected_preview_path: 선택된 프리뷰 이미지 경로 (changed_first_frame)
+        user_prompt: 사용자 프롬프트
+        output_path: 결과 영상 저장 경로
+        on_progress: 진행률 콜백 (stage, percent, message)
+    """
+    def _p(stage, percent, message):
+        if on_progress:
+            on_progress(stage, percent, message)
+
+    # 키워드 추출
+    _, _, kw = step2_auto_detect(user_prompt)
+
+    # 첫 프레임 + 선택된 프리뷰 이미지 로드
+    cap = cv2.VideoCapture(video_path)
+    ret, f1 = cap.read()
+    vw, vh = int(cap.get(3)), int(cap.get(4))
+    cap.release()
+    if not ret:
+        raise IOError("첫 프레임 읽기 실패")
+
+    f2 = cv2.imread(selected_preview_path)
+    if f2 is None:
+        raise IOError(f"프리뷰 이미지 로드 실패: {selected_preview_path}")
+
+    _p("DINO", 15, "Grounding DINO 모델이 객체를 탐지하는 중입니다...")
+    _p("SAM", 25, "SAM 모델이 정밀 마스크를 추출하는 중입니다...")
+    mask, shadow_map, bbox = step4_extract(f1, f2, kw)
+
+    _p("SHADOW", 35, "그림자 맵을 생성하는 중입니다...")
+    _p("SCALE", 40, "객체 스케일링을 처리하는 중입니다...")
+    obj, mr, sr, vbbox = step5_scale(f2, mask, shadow_map, bbox, vw, vh)
+
+    _p("DEPTH", 45, "DPT 모델이 깊이를 추정하는 중입니다...")
+    _p("COMPOSITE", 50, "프레임별 합성을 진행하는 중입니다...")
+    step6_composite(video_path, obj, mr, sr, vbbox, output_path)
+    _p("COMPOSITE", 85, "합성 완료")
+
+    log.info(f"run_composite 완료 → {output_path}")
+
+
 if __name__ == "__main__":
     main()

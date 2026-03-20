@@ -35,19 +35,31 @@ public class JobProgressConsumer {
 
         switch (status) {
             case COMPLETED -> {
-                jobRedisRepository.completeJob(jobId, event.getOutputKey());
-                webSocketPushService.pushJobProgress(jobId, status, 100, event.getMessage());
+                if (event.getPreviewKeys() != null && !event.getPreviewKeys().isEmpty()) {
+                    // 프리뷰 Job 완료
+                    jobRedisRepository.completePreviewJob(jobId, event.getPreviewKeys());
+                    webSocketPushService.pushJobProgress(jobId, status, 100,
+                            event.getStage(), event.getMessage(), event.getPreviewKeys());
+                } else {
+                    // 합성 Job 완료
+                    jobRedisRepository.completeJob(jobId, event.getOutputKey());
+                    webSocketPushService.pushJobProgress(jobId, status, 100,
+                            event.getStage(), event.getMessage(), null);
+                }
             }
             case FAILED -> {
                 jobRedisRepository.failJob(jobId, event.getMessage());
-                webSocketPushService.pushJobProgress(jobId, status, event.getPercent(), event.getMessage());
+                webSocketPushService.pushJobProgress(jobId, status, event.getPercent(),
+                        event.getStage(), event.getMessage(), null);
             }
             default -> {
                 jobRedisRepository.updateProgress(jobId, status, event.getPercent(), event.getStage(), event.getMessage());
-                webSocketPushService.pushJobProgress(jobId, status, event.getPercent(), event.getMessage());
+                webSocketPushService.pushJobProgress(jobId, status, event.getPercent(),
+                        event.getStage(), event.getMessage(), null);
             }
         }
 
-        log.debug("Processed job progress event: jobId={}, status={}, percent={}", jobId, status, event.getPercent());
+        log.debug("Processed job progress event: jobId={}, status={}, stage={}, percent={}",
+                jobId, status, event.getStage(), event.getPercent());
     }
 }
