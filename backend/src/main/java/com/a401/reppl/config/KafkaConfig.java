@@ -9,11 +9,17 @@ import org.springframework.kafka.config.TopicBuilder;
 @Configuration
 public class KafkaConfig {
 
-    @Value("${kafka.topic.job-request}")
-    private String jobRequestTopic;
+    @Value("${kafka.topic.job-preview}")
+    private String jobPreviewTopic;
 
-    @Value("${kafka.topic.job-request.partitions}")
-    private int jobRequestPartitions;
+    @Value("${kafka.topic.job-preview.partitions}")
+    private int jobPreviewPartitions;
+
+    @Value("${kafka.topic.job-composite}")
+    private String jobCompositeTopic;
+
+    @Value("${kafka.topic.job-composite.partitions}")
+    private int jobCompositePartitions;
 
     @Value("${kafka.topic.job-progress}")
     private String jobProgressTopic;
@@ -22,9 +28,17 @@ public class KafkaConfig {
     private int jobProgressPartitions;
 
     @Bean
-    public NewTopic jobRequestTopic() {
-        return TopicBuilder.name(jobRequestTopic)
-                .partitions(jobRequestPartitions)
+    public NewTopic jobPreviewTopic() {
+        return TopicBuilder.name(jobPreviewTopic)
+                .partitions(jobPreviewPartitions)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
+    public NewTopic jobCompositeTopic() {
+        return TopicBuilder.name(jobCompositeTopic)
+                .partitions(jobCompositePartitions)
                 .replicas(1)
                 .build();
     }

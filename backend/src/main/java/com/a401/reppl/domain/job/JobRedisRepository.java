@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -90,6 +91,25 @@ public class JobRedisRepository {
         // cleanup 대상에 추가
         long expirationTime = Instant.now().plus(JOB_TTL).toEpochMilli();
         redisTemplate.opsForZSet().add(JobKeys.CLEANUP_JOBS, jobId, expirationTime);
+    }
+
+    /**
+     * 프리뷰 Job 완료 처리 (프리뷰 이미지 키 저장)
+     */
+    public void completePreviewJob(String jobId, List<String> previewKeys) {
+        String key = JobKeys.jobState(jobId);
+        Map<String, String> updates = new HashMap<>();
+        updates.put("status", JobStatus.COMPLETED.name());
+        updates.put("progress", "100");
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            updates.put("previewKeys", mapper.writeValueAsString(previewKeys));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            updates.put("previewKeys", "[]");
+        }
+        updates.put("updatedAt", Instant.now().toString());
+
+        redisTemplate.opsForHash().putAll(key, updates);
     }
 
     /**
