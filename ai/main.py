@@ -983,5 +983,44 @@ def main():
     print("=" * 55)
 
 
+def run_pipeline(video_path, obj_img_path, user_prompt, output_path, on_progress=None):
+    """
+    외부(worker)에서 호출 가능한 파이프라인 진입점.
+
+    Args:
+        video_path: 영상 파일 경로
+        obj_img_path: 합성할 객체 이미지 경로
+        user_prompt: 사용자 프롬프트 (한국어/영어, 키워드 자동 추출)
+        output_path: 결과 영상 저장 경로
+        on_progress: 진행률 콜백 (stage, percent, message) → None
+    """
+    def _p(stage, percent, message):
+        if on_progress:
+            on_progress(stage, percent, message)
+
+    # 키워드 추출 (step2의 키워드 로직 재사용)
+    _, _, kw = step2_auto_detect(user_prompt)
+
+    _p("DETECT", 12, "프레임 로딩 중...")
+    f1, f2 = step3_gemini(video_path, obj_img_path, kw)
+
+    cap = cv2.VideoCapture(video_path)
+    vw, vh = int(cap.get(3)), int(cap.get(4))
+    cap.release()
+
+    _p("DETECT", 15, "객체 탐지 중 (DINO + SAM)...")
+    mask, shadow_map, bbox = step4_extract(f1, f2, kw)
+    _p("DETECT", 35, "객체 탐지 완료")
+
+    _p("REPLACE", 38, "스케일링 중...")
+    obj, mr, sr, vbbox = step5_scale(f2, mask, shadow_map, bbox, vw, vh)
+
+    _p("REPLACE", 40, "영상 합성 중...")
+    step6_composite(video_path, obj, mr, sr, vbbox, output_path)
+    _p("ENCODE", 85, "합성 완료")
+
+    log.info(f"run_pipeline 완료 → {output_path}")
+
+
 if __name__ == "__main__":
     main()

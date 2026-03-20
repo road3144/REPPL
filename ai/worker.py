@@ -8,25 +8,15 @@ Kafka에서 작업 요청을 수신하여 AI 파이프라인을 실행하고,
 """
 
 import os
-import shutil
 import logging
 import traceback
-
-import cv2
 
 from config import AWS_S3_BUCKET
 from kafka_client import KafkaJobConsumer, KafkaProgressProducer
 from s3_client import download_file, upload_file
 
-# main.py에서 파이프라인 함수 import (main.py 수정 없이 사용)
-from main import (
-    INPUTS,
-    OUTPUTS,
-    step3_gemini,
-    step4_extract,
-    step5_scale,
-    step6_composite,
-)
+# main.py의 통합 파이프라인 진입점
+from main import INPUTS, OUTPUTS, run_pipeline
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,11 +24,6 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger(__name__)
-
-
-def _extract_filename(s3_key: str) -> str:
-    """S3 key에서 파일명만 추출한다."""
-    return os.path.basename(s3_key)
 
 
 def _cleanup(*paths):
@@ -63,16 +48,16 @@ def process_job(event: dict, producer: KafkaProgressProducer):
     output_bucket = out["bucket"]
     output_key = out["key"]
 
-    keyword = options.get("placementPrompt", "object")
+    prompt = options.get("placementPrompt", "object")
 
-    video_filename = _extract_filename(video_s3["key"])
-    video_local = os.path.join(INPUTS, video_filename)
-    image_local = os.path.join(INPUTS, "changed_first_frame.png")
+    # 로컬 파일 경로
+    video_local = os.path.join(INPUTS, os.path.basename(video_s3["key"]))
+    img_local = os.path.join(INPUTS, os.path.basename(images_s3[0]["key"])) if images_s3 else None
     output_local = os.path.join(OUTPUTS, f"{job_id}_output.mp4")
 
     log.info(f"=== Job 시작: {job_id} ===")
     log.info(f"  video: s3://{video_s3['bucket']}/{video_s3['key']}")
-    log.info(f"  keyword: {keyword}")
+    log.info(f"  prompt: {prompt}")
 
     try:
         # ── DOWNLOAD ──
@@ -82,36 +67,25 @@ def process_job(event: dict, producer: KafkaProgressProducer):
         if images_s3:
             producer.send_progress(job_id, "RUNNING", "DOWNLOAD", 8, "참조 이미지 다운로드 중...")
             img = images_s3[0]
-            download_file(img["bucket"], img["key"], image_local)
+            download_file(img["bucket"], img["key"], img_local)
 
         producer.send_progress(job_id, "RUNNING", "DOWNLOAD", 10, "다운로드 완료")
 
-        # ── DETECT (step3 + step4) ──
-        producer.send_progress(job_id, "RUNNING", "DETECT", 12, "프레임 로딩 중...")
-        f1, f2 = step3_gemini(video_local, keyword)
+        # ── 파이프라인 실행 (main.py의 run_pipeline) ──
+        def on_progress(stage, percent, message):
+            producer.send_progress(job_id, "RUNNING", stage, percent, message)
 
-        cap = cv2.VideoCapture(video_local)
-        vw, vh = int(cap.get(3)), int(cap.get(4))
-        cap.release()
-
-        producer.send_progress(job_id, "RUNNING", "DETECT", 15, "객체 탐지 중 (DINO + SAM)...")
-        mask, shadow_map, bbox = step4_extract(f1, f2, keyword)
-
-        producer.send_progress(job_id, "RUNNING", "DETECT", 35, "객체 탐지 완료")
-
-        # ── REPLACE (step5 + step6) ──
-        producer.send_progress(job_id, "RUNNING", "REPLACE", 38, "스케일링 중...")
-        obj, mr, sr, vbbox = step5_scale(f2, mask, shadow_map, bbox, vw, vh)
-
-        producer.send_progress(job_id, "RUNNING", "REPLACE", 40, "영상 합성 중...")
-        step6_composite(video_local, obj, mr, sr, vbbox, output_local)
-
-        producer.send_progress(job_id, "RUNNING", "ENCODE", 85, "합성 완료")
+        run_pipeline(
+            video_path=video_local,
+            obj_img_path=img_local,
+            user_prompt=prompt,
+            output_path=output_local,
+            on_progress=on_progress,
+        )
 
         # ── UPLOAD ──
         producer.send_progress(job_id, "RUNNING", "UPLOAD", 90, "결과 업로드 중...")
         upload_file(output_local, output_bucket, output_key)
-
         producer.send_progress(job_id, "RUNNING", "UPLOAD", 95, "업로드 완료")
 
         # ── COMPLETED ──
@@ -129,7 +103,7 @@ def process_job(event: dict, producer: KafkaProgressProducer):
         )
 
     finally:
-        _cleanup(video_local, image_local, output_local)
+        _cleanup(video_local, img_local, output_local)
 
 
 def run():
