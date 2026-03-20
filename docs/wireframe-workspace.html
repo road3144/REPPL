@@ -3,602 +3,386 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VPPL - Workspace Wireframe</title>
+<title>RE:PPL - Workspace Wireframe</title>
 <script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f8; color: #1a1a1a; height: 100vh; overflow: hidden; }
 
-  /* LAYOUT */
+  /* ============================
+     APP SHELL
+  ============================ */
   .app { display: flex; flex-direction: column; height: 100vh; }
 
   /* TOP NAV */
   .top-nav {
     height: 56px; background: #fff; border-bottom: 1px solid #e5e7ef;
-    display: flex; align-items: center; padding: 0 20px; gap: 0; flex-shrink: 0;
+    display: flex; align-items: center; padding: 0 24px; flex-shrink: 0;
     box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   }
-  .nav-logo { font-size: 18px; font-weight: 800; color: #111; padding-right: 28px; border-right: 1px solid #eee; }
+  .nav-logo { font-size: 18px; font-weight: 900; color: #111; padding-right: 24px; border-right: 1px solid #eee; letter-spacing: -0.5px; }
   .nav-logo span { color: #4a6cf7; }
-  .nav-breadcrumb { display: flex; align-items: center; gap: 8px; padding-left: 24px; font-size: 14px; color: #666; }
+  .nav-breadcrumb { padding-left: 20px; font-size: 14px; color: #aaa; display: flex; align-items: center; gap: 6px; }
   .nav-breadcrumb .current { color: #111; font-weight: 600; }
-  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
-  .nav-btn {
-    padding: 8px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
-    background: #4a6cf7; color: #fff; border: none;
-  }
+  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
   .nav-avatar {
-    width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #4a6cf7, #7a9cff);
-    display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 700;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, #4a6cf7, #7a9cff);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 13px; font-weight: 700;
   }
-  .nav-divider { width: 1px; height: 24px; background: #eee; }
 
-  /* BODY LAYOUT */
+  /* APP BODY */
   .app-body { display: flex; flex: 1; overflow: hidden; }
 
-  /* SIDEBAR */
-  .sidebar {
-    width: 220px; background: #fff; border-right: 1px solid #e5e7ef;
-    display: flex; flex-direction: column; flex-shrink: 0;
+  /* ============================
+     LEFT PANEL — 새 작업 만들기 (fixed)
+  ============================ */
+  .panel-left {
+    width: 400px; flex-shrink: 0; background: #fff; border-right: 1px solid #e5e7ef;
+    display: flex; flex-direction: column; overflow: hidden;
   }
-  .sidebar-section { padding: 20px 16px 8px; }
-  .sidebar-label { font-size: 10px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 1.5px; padding: 0 8px; margin-bottom: 6px; }
-  .sidebar-item {
-    display: flex; align-items: center; gap: 10px; padding: 9px 12px;
-    border-radius: 8px; font-size: 14px; color: #555; cursor: pointer; font-weight: 500;
-  }
-  .sidebar-item.active { background: #eef1ff; color: #4a6cf7; font-weight: 600; }
-  .sidebar-item:hover:not(.active) { background: #f5f5f8; }
-  .sidebar-item .icon { width: 18px; height: 18px; opacity: 0.6; }
-  .sidebar-item.active .icon { opacity: 1; }
-  .sidebar-badge {
-    margin-left: auto; background: #4a6cf7; color: #fff;
-    font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px;
-  }
-  .sidebar-bottom { margin-top: auto; padding: 16px; border-top: 1px solid #f0f0f5; }
-  .usage-bar-wrap { margin-top: 8px; }
-  .usage-label { font-size: 12px; color: #888; margin-bottom: 6px; display: flex; justify-content: space-between; }
-  .usage-bar { height: 4px; background: #eee; border-radius: 2px; }
-  .usage-fill { height: 4px; width: 42%; background: #4a6cf7; border-radius: 2px; }
-
-  /* MAIN CONTENT */
-  .main { flex: 1; display: flex; overflow: hidden; }
-
-  /* LEFT PANEL: Upload */
-  .panel-upload {
-    width: 380px; flex-shrink: 0; background: #fff; border-right: 1px solid #e5e7ef;
-    overflow-y: auto; display: flex; flex-direction: column;
-  }
-  .panel-header {
-    padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f5;
-    display: flex; align-items: center; justify-content: space-between;
-  }
+  .panel-header { padding: 20px 24px 14px; border-bottom: 1px solid #f0f0f5; }
   .panel-header h2 { font-size: 16px; font-weight: 700; color: #111; }
-  .panel-header .subtitle { font-size: 12px; color: #999; margin-top: 2px; }
-  .panel-body { padding: 20px 24px; flex: 1; display: flex; flex-direction: column; gap: 20px; }
+  .panel-header p { font-size: 12px; color: #999; margin-top: 3px; }
+  .panel-body { padding: 18px 24px; flex: 1; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; }
 
-  /* Upload zones */
-  .upload-zone {
-    border: 2px dashed #d5d9f5; border-radius: 12px; padding: 28px 20px;
-    text-align: center; cursor: pointer; background: #fafbff;
-    transition: all 0.2s;
-  }
-  .upload-zone:hover { border-color: #4a6cf7; background: #f0f3ff; }
-  .upload-zone.filled { border: 1.5px solid #4a6cf7; background: #f5f7ff; padding: 16px 20px; text-align: left; }
-  .upload-icon { font-size: 32px; margin-bottom: 10px; }
-  .upload-zone h4 { font-size: 14px; font-weight: 700; color: #333; margin-bottom: 6px; }
-  .upload-zone p { font-size: 12px; color: #888; line-height: 1.6; }
-  .upload-zone .spec { font-size: 11px; color: #bbb; margin-top: 8px; }
-  .upload-browse { margin-top: 14px; display: inline-block; padding: 7px 20px; background: #4a6cf7; color: #fff; border-radius: 6px; font-size: 12px; font-weight: 600; }
+  .section-label { font-size: 12px; font-weight: 700; color: #444; margin-bottom: 8px; display: flex; align-items: center; gap: 4px; }
+  .required { color: #ef4444; }
 
-  /* Video preview in filled zone */
-  .video-thumb {
-    width: 100%; height: 120px; background: #111; border-radius: 8px; margin-bottom: 10px;
-    display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;
-  }
-  .video-thumb-bg { position: absolute; inset: 0; background: linear-gradient(135deg, #1a1a2e, #0d0d1a); }
-  .video-play-sm {
-    width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.15);
-    border: 1.5px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center;
-    position: relative; z-index: 1;
-  }
-  .video-play-sm::after { content: ''; border-left: 12px solid rgba(255,255,255,0.8); border-top: 8px solid transparent; border-bottom: 8px solid transparent; margin-left: 3px; }
-  .file-info { display: flex; gap: 10px; align-items: center; }
-  .file-icon { width: 36px; height: 36px; border-radius: 8px; background: #eef1ff; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-  .file-meta h5 { font-size: 13px; font-weight: 600; color: #111; }
-  .file-meta p { font-size: 11px; color: #999; margin-top: 2px; }
-  .file-remove { margin-left: auto; font-size: 16px; color: #ccc; cursor: pointer; }
+  /* Video upload filled */
+  .upload-filled { border: 1.5px solid #4a6cf7; border-radius: 12px; overflow: hidden; background: #f5f7ff; }
+  .video-thumb { width: 100%; height: 110px; background: linear-gradient(135deg, #0f0f1a, #1a1a2e); display: flex; align-items: center; justify-content: center; }
+  .play-sm { width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,0.15); border: 1.5px solid rgba(255,255,255,0.3); display: flex; align-items: center; justify-content: center; }
+  .play-sm::after { content: ''; border-left: 11px solid rgba(255,255,255,0.8); border-top: 7px solid transparent; border-bottom: 7px solid transparent; margin-left: 2px; }
+  .file-row { padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+  .file-icon { width: 30px; height: 30px; border-radius: 6px; background: #eef1ff; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+  .file-name { font-size: 12px; font-weight: 600; color: #111; }
+  .file-size { font-size: 11px; color: #aaa; }
+  .remove { margin-left: auto; color: #ccc; font-size: 16px; cursor: pointer; }
 
-  /* Image grid */
-  .image-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
-  .image-thumb {
-    aspect-ratio: 1; border-radius: 8px; background: #eef1ff;
-    display: flex; align-items: center; justify-content: center; font-size: 22px; position: relative;
-  }
-  .image-thumb .remove-dot {
-    position: absolute; top: 4px; right: 4px; width: 18px; height: 18px;
-    background: #ff4444; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 10px; cursor: pointer;
-  }
-  .image-add-btn {
-    aspect-ratio: 1; border-radius: 8px; border: 1.5px dashed #d5d9f5;
-    display: flex; align-items: center; justify-content: center; font-size: 22px; color: #bbb; cursor: pointer;
-  }
+  /* Image upload empty */
+  .upload-empty { border: 2px dashed #d5d9f5; border-radius: 12px; padding: 22px 16px; text-align: center; background: #fafbff; }
+  .upload-empty .icon-wrap { width: 40px; height: 40px; border-radius: 10px; background: #eef1ff; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+  .upload-empty h4 { font-size: 13px; font-weight: 700; color: #333; margin-bottom: 3px; }
+  .upload-empty p { font-size: 11px; color: #aaa; }
+  .browse-btn { display: inline-block; margin-top: 10px; padding: 6px 16px; background: #4a6cf7; color: #fff; border-radius: 6px; font-size: 11px; font-weight: 600; }
 
-  /* Keyword input */
-  .form-group { display: flex; flex-direction: column; gap: 6px; }
-  .form-label { font-size: 13px; font-weight: 600; color: #444; }
-  .form-label span { color: #999; font-weight: 400; font-size: 12px; margin-left: 4px; }
-  .form-input {
-    padding: 11px 14px; border: 1.5px solid #e5e7ef; border-radius: 8px;
-    font-size: 14px; color: #333; outline: none; background: #fff;
-  }
-  .form-input:focus { border-color: #4a6cf7; }
-  .form-hint { font-size: 11px; color: #bbb; }
+  /* Prompt */
+  .prompt-box { padding: 11px 13px; border: 1.5px solid #e5e7ef; border-radius: 10px; font-size: 13px; color: #333; line-height: 1.6; resize: none; height: 80px; font-family: inherit; background: #fff; width: 100%; }
+  .prompt-hint { font-size: 11px; color: #bbb; margin-top: 5px; }
 
-  /* Options accordion */
-  .options-toggle {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 0; cursor: pointer; border-top: 1px solid #f0f0f5;
-  }
-  .options-toggle span { font-size: 13px; font-weight: 600; color: #555; }
-  .options-toggle .arrow { font-size: 12px; color: #bbb; }
-  .option-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
-  .option-label { font-size: 13px; color: #555; }
-  .toggle-switch {
-    width: 36px; height: 20px; border-radius: 10px; background: #4a6cf7;
-    position: relative; cursor: pointer;
-  }
-  .toggle-switch .knob {
-    position: absolute; right: 3px; top: 3px;
-    width: 14px; height: 14px; border-radius: 50%; background: #fff;
-  }
-  .toggle-off { background: #ddd; }
-  .toggle-off .knob { left: 3px; right: auto; }
-  .select-input {
-    padding: 6px 10px; border: 1px solid #e5e7ef; border-radius: 6px;
-    font-size: 12px; color: #555; background: #fff; outline: none;
-  }
+  /* Submit */
+  .submit-area { padding: 14px 24px; border-top: 1px solid #f0f0f5; flex-shrink: 0; }
+  .submit-btn { width: 100%; padding: 13px; background: #4a6cf7; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
 
-  /* Submit btn */
-  .submit-area { padding: 16px 24px; border-top: 1px solid #f0f0f5; }
-  .submit-btn {
-    width: 100%; padding: 14px; background: #4a6cf7; color: #fff;
-    border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-  }
-  .submit-btn:hover { background: #3a5ce5; }
-
-  /* RIGHT PANEL: Job List + Preview */
+  /* ============================
+     RIGHT PANEL — 나의 작업들 (scrollable)
+  ============================ */
   .panel-right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .right-header { padding: 18px 24px 14px; background: #fff; border-bottom: 1px solid #e5e7ef; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .right-header h2 { font-size: 16px; font-weight: 700; color: #111; }
+  .right-header .count { font-size: 13px; color: #aaa; margin-left: 8px; }
+  .filter-tabs { display: flex; gap: 8px; }
+  .filter-tab { padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; background: #f0f2f8; color: #888; cursor: pointer; }
+  .filter-tab.active { background: #4a6cf7; color: #fff; }
 
-  /* Tab bar */
-  .tab-bar {
-    background: #fff; border-bottom: 1px solid #e5e7ef;
-    display: flex; align-items: center; padding: 0 24px; gap: 0; flex-shrink: 0;
-  }
-  .tab {
-    padding: 16px 20px; font-size: 14px; font-weight: 600; color: #aaa; cursor: pointer;
-    border-bottom: 2.5px solid transparent; margin-bottom: -1px;
-  }
-  .tab.active { color: #4a6cf7; border-bottom-color: #4a6cf7; }
-  .tab-count { margin-left: 6px; background: #eef1ff; color: #4a6cf7; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
-
-  /* Job list */
   .job-list { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
 
-  .job-card {
-    background: #fff; border: 1.5px solid #e8ebf5; border-radius: 14px; padding: 20px;
-    cursor: pointer; transition: all 0.15s;
-  }
-  .job-card:hover { border-color: #c5cef5; box-shadow: 0 4px 16px rgba(74,108,247,0.08); }
-  .job-card.selected { border-color: #4a6cf7; box-shadow: 0 0 0 3px rgba(74,108,247,0.12); }
-  .job-card-top { display: flex; align-items: flex-start; gap: 14px; }
-  .job-thumb {
-    width: 88px; height: 56px; border-radius: 8px; background: #1a1a2e; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center; font-size: 20px; position: relative;
-  }
+  /* Job Card */
+  .job-card { background: #fff; border: 1.5px solid #e8ebf5; border-radius: 14px; padding: 18px 20px; cursor: pointer; display: flex; align-items: center; gap: 16px; }
+  .job-card:hover { border-color: #c5cef5; box-shadow: 0 4px 16px rgba(74,108,247,0.07); }
+
+  .job-thumb { width: 80px; height: 52px; border-radius: 8px; background: linear-gradient(135deg, #1a1a2e, #0d0d1a); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+
   .job-info { flex: 1; min-width: 0; }
   .job-title { font-size: 14px; font-weight: 700; color: #111; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .job-meta { font-size: 12px; color: #aaa; margin-top: 3px; display: flex; gap: 12px; }
-  .job-status { margin-left: auto; flex-shrink: 0; }
+  .job-sub { font-size: 12px; color: #aaa; margin-top: 3px; }
+  .job-time { font-size: 11px; color: #ccc; margin-top: 6px; }
 
-  /* Status badges */
-  .badge {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
-  }
-  .badge.processing { background: #fff8e6; color: #f59e0b; }
-  .badge.done { background: #e6faf0; color: #10b981; }
-  .badge.queued { background: #f0f0f8; color: #888; }
-  .badge.failed { background: #fff0f0; color: #ef4444; }
-  .badge::before { content: '●'; font-size: 8px; }
+  .job-status { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .badge-progress { background: #fef3c7; color: #d97706; }
+  .badge-waiting { background: #f0f0f5; color: #999; }
+  .badge-done { background: #dcfce7; color: #16a34a; }
 
-  /* Progress bar */
-  .job-progress { margin-top: 12px; }
-  .progress-label { display: flex; justify-content: space-between; font-size: 12px; color: #888; margin-bottom: 6px; }
-  .progress-bar { height: 4px; background: #eee; border-radius: 2px; }
-  .progress-fill { height: 4px; border-radius: 2px; }
-  .fill-blue { background: #4a6cf7; }
-  .fill-green { background: #10b981; }
-  .fill-gray { background: #ddd; }
+  /* Progress mini bar */
+  .mini-bar { width: 80px; height: 4px; background: #eee; border-radius: 2px; overflow: hidden; }
+  .mini-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #4a6cf7, #7a9cff); }
+  .mini-pct { font-size: 11px; color: #4a6cf7; font-weight: 700; }
 
-  /* Job card bottom */
-  .job-card-bottom { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f5f5f8; }
-  .job-actions { display: flex; gap: 8px; }
-  .action-btn {
-    padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
-    border: 1.5px solid #e5e7ef; background: #fff; color: #555;
-  }
-  .action-btn.primary { background: #4a6cf7; color: #fff; border-color: #4a6cf7; }
-  .action-btn.danger { color: #ef4444; border-color: #ffd5d5; }
-  .job-time { font-size: 11px; color: #ccc; }
+  /* Download link */
+  .download-link { font-size: 12px; color: #4a6cf7; font-weight: 600; }
 
-  /* PREVIEW PANEL (selected job) */
-  .preview-panel {
-    position: absolute; right: 0; top: 56px; bottom: 0; width: 420px;
-    background: #fff; border-left: 1px solid #e5e7ef; overflow-y: auto;
+  /* ============================
+     CANDIDATE DRAWER (right slide-in)
+  ============================ */
+  .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 100; }
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 480px;
+    background: #fff; z-index: 101;
     display: flex; flex-direction: column;
-    box-shadow: -4px 0 20px rgba(0,0,0,0.06);
+    box-shadow: -8px 0 40px rgba(0,0,0,0.18);
   }
-  .preview-header {
-    padding: 20px 24px; border-bottom: 1px solid #f0f0f5;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .preview-header h3 { font-size: 15px; font-weight: 700; color: #111; }
-  .preview-close { font-size: 20px; color: #bbb; cursor: pointer; }
+  .drawer-header { padding: 20px 24px; border-bottom: 1px solid #f0f0f5; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .drawer-header h3 { font-size: 16px; font-weight: 700; color: #111; }
+  .drawer-header p { font-size: 12px; color: #999; margin-top: 3px; }
+  .drawer-close { width: 32px; height: 32px; border-radius: 8px; background: #f5f5f8; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; color: #666; }
+  .drawer-body { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .drawer-footer { padding: 16px 24px; border-top: 1px solid #f0f0f5; flex-shrink: 0; }
 
-  .preview-video {
-    margin: 20px 24px 0; background: #111; border-radius: 12px; overflow: hidden;
-    aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; position: relative;
-  }
-  .preview-video-bg { position: absolute; inset: 0; background: linear-gradient(135deg, #1a1a2e, #0d0d1a); }
-  .preview-play {
-    width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,0.15);
-    border: 2px solid rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: center;
-    position: relative; z-index: 1; cursor: pointer;
-  }
-  .preview-play::after { content: ''; border-left: 18px solid rgba(255,255,255,0.85); border-top: 11px solid transparent; border-bottom: 11px solid transparent; margin-left: 4px; }
-  .preview-video-label { position: absolute; bottom: 12px; left: 16px; font-size: 11px; color: rgba(255,255,255,0.4); letter-spacing: 1px; z-index: 1; }
+  /* Candidate cards in drawer */
+  .cand-card { border: 2px solid #e8ebf5; border-radius: 12px; overflow: hidden; cursor: pointer; }
+  .cand-card.selected { border-color: #4a6cf7; box-shadow: 0 0 0 3px rgba(74,108,247,0.12); }
+  .cand-img { width: 100%; height: 150px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: rgba(255,255,255,0.25); letter-spacing: 1px; text-transform: uppercase; position: relative; }
+  .cand-img.s1 { background: linear-gradient(135deg, #0f1a1a, #0d2e1a); }
+  .cand-img.s2 { background: linear-gradient(135deg, #1a0f1a, #2e0d28); }
+  .cand-img.s3 { background: linear-gradient(135deg, #1a1a0f, #2a2e0d); }
+  .cand-sel-badge { position: absolute; top: 10px; right: 10px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; background: #4a6cf7; color: #fff; }
+  .cand-rec-badge { position: absolute; top: 10px; right: 10px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; background: rgba(0,0,0,0.45); color: #fff; }
+  .cand-footer { padding: 12px 14px; background: #fff; }
+  .cand-name { font-size: 13px; font-weight: 700; color: #111; }
+  .cand-desc { font-size: 12px; color: #aaa; margin-top: 2px; }
+  .confirm-btn { width: 100%; padding: 13px; background: #4a6cf7; color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
 
-  .preview-body { padding: 20px 24px; flex: 1; }
-  .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f5f5f8; }
-  .info-row:last-child { border-bottom: none; }
-  .info-key { font-size: 13px; color: #999; }
-  .info-val { font-size: 13px; font-weight: 600; color: #333; }
-
-  .preview-progress { margin: 20px 24px; }
-  .preview-progress-title { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 10px; }
-  .progress-steps { display: flex; flex-direction: column; gap: 8px; }
-  .p-step { display: flex; align-items: center; gap: 10px; }
-  .p-step-dot {
-    width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center; font-size: 10px;
+  /* ============================
+     KAKAO-STYLE TOAST (bottom-right)
+  ============================ */
+  .toast-wrap { position: fixed; bottom: 28px; right: 28px; z-index: 200; }
+  .toast {
+    background: #1e1e2e; color: #fff;
+    border-radius: 16px; padding: 14px 18px;
+    display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(74,108,247,0.25);
+    min-width: 300px; max-width: 340px;
+    position: relative; overflow: hidden;
   }
-  .p-step-dot.done { background: #10b981; color: #fff; }
-  .p-step-dot.active { background: #4a6cf7; color: #fff; }
-  .p-step-dot.pending { background: #eee; color: #bbb; }
-  .p-step-label { font-size: 13px; }
-  .p-step.done-step .p-step-label { color: #555; }
-  .p-step.active-step .p-step-label { color: #4a6cf7; font-weight: 600; }
-  .p-step.pending-step .p-step-label { color: #bbb; }
-
-  .preview-actions { padding: 16px 24px; border-top: 1px solid #f0f0f5; display: flex; flex-direction: column; gap: 10px; }
-  .download-btn {
-    width: 100%; padding: 12px; background: #10b981; color: #fff;
-    border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 6px;
-  }
-  .share-btn {
-    width: 100%; padding: 12px; background: #fff; color: #555;
-    border: 1.5px solid #e5e7ef; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
-  }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 2px; }
+  .toast-icon { width: 38px; height: 38px; border-radius: 10px; background: #4a6cf7; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 18px; }
+  .toast-body { flex: 1; min-width: 0; }
+  .toast-title { font-size: 13px; font-weight: 700; }
+  .toast-desc { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .toast-close { color: rgba(255,255,255,0.35); font-size: 16px; cursor: pointer; flex-shrink: 0; }
+  .toast-bar { position: absolute; bottom: 0; left: 0; height: 3px; background: #4a6cf7; width: 45%; border-radius: 0 3px 3px 0; }
 </style>
 </head>
 <body>
+
 <div class="app">
 
   <!-- TOP NAV -->
   <nav class="top-nav">
-    <div class="nav-logo">VP<span>PL</span></div>
+    <span class="nav-logo">RE:<span>PPL</span></span>
     <div class="nav-breadcrumb">
-      <span>작업 스튜디오</span>
-      <span style="color:#ddd">/</span>
-      <span class="current">새 작업 만들기</span>
+      <span>홈</span><span>›</span><span class="current">작업</span>
     </div>
     <div class="nav-right">
-      <div class="nav-btn">+ 새 작업</div>
-      <div class="nav-divider"></div>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      <div class="nav-avatar">윤</div>
+      <div class="nav-avatar">U</div>
     </div>
   </nav>
 
+  <!-- APP BODY -->
   <div class="app-body">
-    <!-- SIDEBAR -->
-    <div class="sidebar">
-      <div class="sidebar-section">
-        <div class="sidebar-label">메뉴</div>
-        <div class="sidebar-item active">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          작업 스튜디오
-          <span class="sidebar-badge">3</span>
-        </div>
-        <div class="sidebar-item">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          내 결과물
-        </div>
-        <div class="sidebar-item">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          작업 내역
-        </div>
+
+    <!-- LEFT: 새 작업 만들기 (fixed) -->
+    <div class="panel-left">
+      <div class="panel-header">
+        <h2>새 작업 만들기</h2>
+        <p>영상과 광고 이미지를 업로드하세요</p>
       </div>
-      <div class="sidebar-section" style="margin-top:8px;">
-        <div class="sidebar-label">설정</div>
-        <div class="sidebar-item">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2m0 18v-2m7.07-5.07l-1.41-1.41M4.93 19.07l1.41-1.41M22 12h-2M4 12H2"/></svg>
-          설정
+
+      <div class="panel-body">
+
+        <!-- Video (filled) -->
+        <div>
+          <div class="section-label">원본 영상 <span class="required">*</span></div>
+          <div class="upload-filled">
+            <div class="video-thumb"><div class="play-sm"></div></div>
+            <div class="file-row">
+              <div class="file-icon">🎬</div>
+              <div>
+                <div class="file-name">drama_ep03_cut.mp4</div>
+                <div class="file-size">128.4 MB · 2분 34초</div>
+              </div>
+              <span class="remove">×</span>
+            </div>
+          </div>
         </div>
-        <div class="sidebar-item">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          도움말
+
+        <!-- Image (empty) -->
+        <div>
+          <div class="section-label">광고 이미지 <span class="required">*</span></div>
+          <div class="upload-empty">
+            <div class="icon-wrap">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4a6cf7" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/>
+              </svg>
+            </div>
+            <h4>광고 이미지 업로드</h4>
+            <p>PNG, JPG · 최대 20MB</p>
+            <span class="browse-btn">파일 선택</span>
+          </div>
         </div>
+
+        <!-- Prompt -->
+        <div>
+          <div class="section-label">삽입 지시 프롬프트 <span class="required">*</span></div>
+          <textarea class="prompt-box" placeholder="예: 테이블 위에 자연스럽게 놓아줘.">테이블 위에 자연스럽게 배치해줘.</textarea>
+          <div class="prompt-hint">구체적일수록 더 정확한 결과를 얻을 수 있어요</div>
+        </div>
+
       </div>
-      <div class="sidebar-bottom">
-        <div style="font-size:12px;color:#999;font-weight:600;">이번 달 사용량</div>
-        <div class="usage-bar-wrap">
-          <div class="usage-label"><span>3 / 7 작업</span><span style="color:#4a6cf7">42%</span></div>
-          <div class="usage-bar"><div class="usage-fill"></div></div>
-        </div>
+
+      <div class="submit-area">
+        <button class="submit-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          AI 분석 시작
+        </button>
       </div>
     </div>
 
-    <!-- MAIN AREA -->
-    <div class="main" style="position:relative;">
-
-      <!-- UPLOAD PANEL -->
-      <div class="panel-upload">
-        <div class="panel-header">
-          <div>
-            <h2>새 작업 만들기</h2>
-            <div class="subtitle">영상과 상품 이미지를 업로드하세요</div>
-          </div>
+    <!-- RIGHT: 나의 작업들 -->
+    <div class="panel-right">
+      <div class="right-header">
+        <div>
+          <span style="font-size:16px; font-weight:700; color:#111;">나의 작업들</span>
+          <span class="count">· 5개</span>
         </div>
-        <div class="panel-body">
-
-          <!-- Video upload (filled state) -->
-          <div>
-            <div class="form-label" style="margin-bottom:10px;">📹 원본 영상 <span>필수</span></div>
-            <div class="upload-zone filled">
-              <div class="video-thumb">
-                <div class="video-thumb-bg"></div>
-                <div class="video-play-sm"></div>
-                <div style="position:absolute;bottom:6px;left:10px;font-size:10px;color:rgba(255,255,255,0.4);z-index:1;">00:24:37</div>
-              </div>
-              <div class="file-info">
-                <div class="file-icon">🎬</div>
-                <div class="file-meta">
-                  <h5>drama_ep12_cut.mp4</h5>
-                  <p>1920 × 1080 · 24fps · 2.4 GB</p>
-                </div>
-                <div class="file-remove">×</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Product images (filled) -->
-          <div>
-            <div class="form-label" style="margin-bottom:10px;">🛍️ 상품 이미지 <span>최대 5장</span></div>
-            <div class="upload-zone filled">
-              <div class="image-grid">
-                <div class="image-thumb">👟<div class="remove-dot">×</div></div>
-                <div class="image-thumb">👟<div class="remove-dot">×</div></div>
-                <div class="image-add-btn">+</div>
-              </div>
-              <div class="file-info" style="margin-top:0;">
-                <div class="file-icon" style="font-size:12px;">ℹ️</div>
-                <div class="file-meta">
-                  <h5>2장 업로드됨</h5>
-                  <p>PNG, JPG 권장 · 흰 배경 선호</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Keyword -->
-          <div class="form-group">
-            <div class="form-label">🔍 상품 키워드 <span>Gemini 이미지 생성에 사용</span></div>
-            <input class="form-input" type="text" value="white Nike running shoes" />
-            <div class="form-hint">영어로 입력하면 더 정확한 합성 결과가 나옵니다</div>
-          </div>
-
-          <!-- Target location -->
-          <div class="form-group">
-            <div class="form-label">📍 삽입 위치 힌트 <span>선택사항</span></div>
-            <input class="form-input" type="text" placeholder="예: 소파 위, 테이블 옆, 창문 근처" />
-          </div>
-
-          <!-- Advanced options -->
-          <div>
-            <div class="options-toggle">
-              <span>고급 옵션</span>
-              <span class="arrow">▼</span>
-            </div>
-            <div class="option-row">
-              <div class="option-label">가려짐(Occlusion) 처리</div>
-              <div class="toggle-switch"><div class="knob"></div></div>
-            </div>
-            <div class="option-row">
-              <div class="option-label">그림자 자동 생성</div>
-              <div class="toggle-switch"><div class="knob"></div></div>
-            </div>
-            <div class="option-row">
-              <div class="option-label">출력 해상도</div>
-              <select class="select-input"><option>원본 유지 (1080p)</option><option>4K 업스케일</option><option>720p</option></select>
-            </div>
-          </div>
-        </div>
-
-        <!-- Submit -->
-        <div class="submit-area">
-          <button class="submit-btn">
-            ⚡ AI 합성 시작
-          </button>
-          <div style="text-align:center;margin-top:10px;font-size:11px;color:#bbb;">예상 소요 시간: 약 15~40분 · 완료 시 알림 전송</div>
+        <div class="filter-tabs">
+          <div class="filter-tab active">전체</div>
+          <div class="filter-tab">진행 중</div>
+          <div class="filter-tab">대기 중</div>
+          <div class="filter-tab">완료</div>
         </div>
       </div>
 
-      <!-- RIGHT: Job List + Tabs -->
-      <div class="panel-right">
-        <div class="tab-bar">
-          <div class="tab active">진행 중 <span class="tab-count">2</span></div>
-          <div class="tab">완료됨 <span class="tab-count">1</span></div>
-          <div class="tab">전체 <span class="tab-count">3</span></div>
+      <div class="job-list">
+
+        <!-- 진행 중 -->
+        <div class="job-card">
+          <div class="job-thumb">🎬</div>
+          <div class="job-info">
+            <div class="job-title">drama_ep03_cut.mp4</div>
+            <div class="job-sub">광고: product_bottle.png · 장면 A 합성 중</div>
+            <div class="job-time">2분 전 시작</div>
+          </div>
+          <div class="job-status">
+            <span class="badge badge-progress">진행 중</span>
+            <div class="mini-bar"><div class="mini-fill" style="width:62%"></div></div>
+            <span class="mini-pct">62%</span>
+          </div>
         </div>
 
-        <div class="job-list">
-
-          <!-- Job 1: Processing -->
-          <div class="job-card selected">
-            <div class="job-card-top">
-              <div class="job-thumb">🎬<div style="position:absolute;inset:0;background:rgba(0,0,0,0.4);border-radius:8px;"></div></div>
-              <div class="job-info">
-                <div class="job-title">drama_ep12_cut.mp4 — Nike 운동화</div>
-                <div class="job-meta">
-                  <span>24분 37초</span>
-                  <span>1080p</span>
-                  <span>2.4 GB</span>
-                </div>
-              </div>
-              <div class="job-status"><span class="badge processing">처리 중</span></div>
-            </div>
-            <div class="job-progress">
-              <div class="progress-label"><span>광학 흐름 추적 중…</span><span>67%</span></div>
-              <div class="progress-bar"><div class="progress-fill fill-blue" style="width:67%"></div></div>
-            </div>
-            <div class="job-card-bottom">
-              <div class="job-time">시작: 14:23 · 예상 완료: 14:58</div>
-              <div class="job-actions">
-                <button class="action-btn danger">취소</button>
-              </div>
-            </div>
+        <!-- 대기 중 -->
+        <div class="job-card">
+          <div class="job-thumb">🎬</div>
+          <div class="job-info">
+            <div class="job-title">cf_raw_take2.mp4</div>
+            <div class="job-sub">광고: sneakers_ad.jpg · 위치 선택 대기</div>
+            <div class="job-time">5분 전 제출</div>
           </div>
-
-          <!-- Job 2: Queued -->
-          <div class="job-card">
-            <div class="job-card-top">
-              <div class="job-thumb">🎬<div style="position:absolute;inset:0;background:rgba(0,0,0,0.5);border-radius:8px;"></div></div>
-              <div class="job-info">
-                <div class="job-title">variety_show_ep5.mp4 — 삼성 갤럭시</div>
-                <div class="job-meta">
-                  <span>42분 10초</span>
-                  <span>1080p</span>
-                  <span>4.1 GB</span>
-                </div>
-              </div>
-              <div class="job-status"><span class="badge queued">대기 중</span></div>
-            </div>
-            <div class="job-progress">
-              <div class="progress-label"><span>대기열: 1번째</span><span>0%</span></div>
-              <div class="progress-bar"><div class="progress-fill fill-gray" style="width:0%"></div></div>
-            </div>
-            <div class="job-card-bottom">
-              <div class="job-time">접수: 15:01</div>
-              <div class="job-actions">
-                <button class="action-btn danger">취소</button>
-              </div>
-            </div>
+          <div class="job-status">
+            <span class="badge badge-waiting">대기 중</span>
           </div>
-
-          <!-- Job 3: Done -->
-          <div class="job-card">
-            <div class="job-card-top">
-              <div class="job-thumb">🎬<div style="position:absolute;inset:0;background:rgba(0,0,0,0.3);border-radius:8px;"></div></div>
-              <div class="job-info">
-                <div class="job-title">morning_drama_ep3.mp4 — 스타벅스 텀블러</div>
-                <div class="job-meta">
-                  <span>18분 22초</span>
-                  <span>1080p</span>
-                  <span>1.8 GB</span>
-                </div>
-              </div>
-              <div class="job-status"><span class="badge done">완료</span></div>
-            </div>
-            <div class="job-progress">
-              <div class="progress-label"><span>합성 완료</span><span>100%</span></div>
-              <div class="progress-bar"><div class="progress-fill fill-green" style="width:100%"></div></div>
-            </div>
-            <div class="job-card-bottom">
-              <div class="job-time">완료: 어제 09:42</div>
-              <div class="job-actions">
-                <button class="action-btn">미리보기</button>
-                <button class="action-btn primary">다운로드</button>
-              </div>
-            </div>
-          </div>
-
         </div>
+
+        <!-- 완료 -->
+        <div class="job-card">
+          <div class="job-thumb">🎬</div>
+          <div class="job-info">
+            <div class="job-title">variety_show_ep07.mp4</div>
+            <div class="job-sub">광고: coffee_brand.png · 장면 B 적용</div>
+            <div class="job-time">오늘 오후 2:14 완료</div>
+          </div>
+          <div class="job-status">
+            <span class="badge badge-done">완료</span>
+            <span class="download-link">↓ 다운로드</span>
+          </div>
+        </div>
+
+        <!-- 완료 -->
+        <div class="job-card">
+          <div class="job-thumb">🎬</div>
+          <div class="job-info">
+            <div class="job-title">drama_ep01_highlight.mp4</div>
+            <div class="job-sub">광고: watch_luxury.jpg · 장면 C 적용</div>
+            <div class="job-time">어제 오후 5:30 완료</div>
+          </div>
+          <div class="job-status">
+            <span class="badge badge-done">완료</span>
+            <span class="download-link">↓ 다운로드</span>
+          </div>
+        </div>
+
+        <!-- 완료 -->
+        <div class="job-card">
+          <div class="job-thumb">🎬</div>
+          <div class="job-info">
+            <div class="job-title">entertainment_clip_03.mp4</div>
+            <div class="job-sub">광고: food_brand.png · 장면 A 적용</div>
+            <div class="job-time">어제 오전 11:02 완료</div>
+          </div>
+          <div class="job-status">
+            <span class="badge badge-done">완료</span>
+            <span class="download-link">↓ 다운로드</span>
+          </div>
+        </div>
+
       </div>
+    </div>
 
-      <!-- PREVIEW PANEL (slide-in, selected job) -->
-      <div class="preview-panel">
-        <div class="preview-header">
-          <div>
-            <h3>drama_ep12_cut.mp4</h3>
-            <div style="font-size:12px;color:#aaa;margin-top:2px;">Nike 운동화 합성 작업</div>
-          </div>
-          <div class="preview-close">×</div>
-        </div>
+  </div>
+</div>
 
-        <!-- Video player placeholder -->
-        <div class="preview-video">
-          <div class="preview-video-bg"></div>
-          <div class="preview-play"></div>
-          <div class="preview-video-label">합성 결과 미리보기</div>
-        </div>
-
-        <!-- Before/After toggle -->
-        <div style="display:flex;gap:0;margin:16px 24px 0;border:1.5px solid #e8ebf5;border-radius:8px;overflow:hidden;">
-          <div style="flex:1;text-align:center;padding:8px;background:#4a6cf7;color:#fff;font-size:13px;font-weight:600;">합성 결과</div>
-          <div style="flex:1;text-align:center;padding:8px;background:#fff;color:#888;font-size:13px;font-weight:600;cursor:pointer;">원본 비교</div>
-        </div>
-
-        <!-- Progress steps -->
-        <div class="preview-progress">
-          <div class="preview-progress-title">처리 단계</div>
-          <div class="progress-steps">
-            <div class="p-step done-step"><div class="p-step-dot done">✓</div><div class="p-step-label">첫 프레임 Gemini 합성</div></div>
-            <div class="p-step done-step"><div class="p-step-dot done">✓</div><div class="p-step-label">Grounding DINO 객체 검출</div></div>
-            <div class="p-step done-step"><div class="p-step-dot done">✓</div><div class="p-step-label">SAM 마스크 추출</div></div>
-            <div class="p-step active-step"><div class="p-step-dot active">⟳</div><div class="p-step-label">Lucas-Kanade 전체 프레임 추적 (67%)</div></div>
-            <div class="p-step pending-step"><div class="p-step-dot pending">○</div><div class="p-step-label">최종 합성 출력</div></div>
-          </div>
-        </div>
-
-        <!-- Job info -->
-        <div class="preview-body">
-          <div class="info-row"><span class="info-key">파일명</span><span class="info-val">drama_ep12_cut.mp4</span></div>
-          <div class="info-row"><span class="info-key">상품 키워드</span><span class="info-val">white Nike running shoes</span></div>
-          <div class="info-row"><span class="info-key">해상도</span><span class="info-val">1920 × 1080</span></div>
-          <div class="info-row"><span class="info-key">재생 시간</span><span class="info-val">24분 37초</span></div>
-          <div class="info-row"><span class="info-key">상태</span><span class="info-val" style="color:#f59e0b;">처리 중 (67%)</span></div>
-          <div class="info-row"><span class="info-key">예상 완료</span><span class="info-val">14:58</span></div>
-        </div>
-
-        <!-- Actions -->
-        <div class="preview-actions">
-          <button class="download-btn" style="opacity:0.4;cursor:not-allowed;">⬇ 결과 다운로드 (처리 완료 후)</button>
-          <button class="share-btn">🔗 링크 공유</button>
-        </div>
+<!-- CANDIDATE SELECTION DRAWER (right slide-in) -->
+<div class="drawer-overlay"></div>
+<div class="drawer">
+  <div class="drawer-header">
+    <div>
+      <h3>삽입 위치 선택</h3>
+      <p>AI가 추천하는 장면 중 하나를 선택하세요</p>
+    </div>
+    <div class="drawer-close">×</div>
+  </div>
+  <div class="drawer-body">
+    <div class="cand-card selected">
+      <div class="cand-img s1">scene 1<div class="cand-sel-badge">선택됨</div></div>
+      <div class="cand-footer">
+        <div class="cand-name">장면 A · 00:34</div>
+        <div class="cand-desc">자연스러운 배치 · 신뢰도 94%</div>
       </div>
+    </div>
+    <div class="cand-card">
+      <div class="cand-img s2">scene 2<div class="cand-rec-badge">추천</div></div>
+      <div class="cand-footer">
+        <div class="cand-name">장면 B · 01:12</div>
+        <div class="cand-desc">주목도 높음 · 신뢰도 89%</div>
+      </div>
+    </div>
+    <div class="cand-card">
+      <div class="cand-img s3">scene 3<div class="cand-rec-badge">추천</div></div>
+      <div class="cand-footer">
+        <div class="cand-name">장면 C · 02:05</div>
+        <div class="cand-desc">클로즈업 구도 · 신뢰도 82%</div>
+      </div>
+    </div>
+  </div>
+  <div class="drawer-footer">
+    <button class="confirm-btn">이 장면으로 합성 시작 →</button>
+  </div>
+</div>
 
-    </div><!-- /main -->
-  </div><!-- /app-body -->
-</div><!-- /app -->
+<!-- KAKAO-STYLE TOAST (bottom-right) -->
+<div class="toast-wrap">
+  <div class="toast">
+    <div class="toast-icon">🎉</div>
+    <div class="toast-body">
+      <div class="toast-title">합성이 완료되었습니다!</div>
+      <div class="toast-desc">drama_ep03_cut_output.mp4 다운로드 준비 완료</div>
+    </div>
+    <span class="toast-close">×</span>
+    <div class="toast-bar"></div>
+  </div>
+</div>
+
 </body>
 </html>

@@ -149,6 +149,24 @@ export async function createJob(payload: {
   });
 }
 
+export type CandidateFrame = {
+  id: string;
+  color: string;
+  timestampLabel: string;
+  description: string;
+  confidence: number;
+};
+
+export async function getCandidateFrames(_videoKey: string): Promise<CandidateFrame[]> {
+  // Mock: simulate AI analysis delay
+  await new Promise(r => setTimeout(r, 1500));
+  return [
+    { id: 'A', color: 'linear-gradient(135deg, #0f1a1a, #0d2e1a)', timestampLabel: '장면 A · 00:34', description: '자연스러운 배치', confidence: 94 },
+    { id: 'B', color: 'linear-gradient(135deg, #1a0f1a, #2e0d28)', timestampLabel: '장면 B · 01:12', description: '주목도 높음', confidence: 89 },
+    { id: 'C', color: 'linear-gradient(135deg, #1a1a0f, #2a2e0d)', timestampLabel: '장면 C · 02:05', description: '클로즈업 구도', confidence: 82 },
+  ];
+}
+
 export async function uploadWithPresignedUrl(file: File, uploadInfo: { url: string; headers: Record<string, string> }) {
   const response = await fetch(uploadInfo.url, {
     method: 'PUT',
