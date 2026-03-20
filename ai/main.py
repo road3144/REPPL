@@ -279,6 +279,7 @@ def step3_gemini(video_path, prompt):
 def _dino_detect(frame, keyword):
     """
     Grounding DINO로 객체 BBox를 검출한다.
+    검출된 모든 객체의 bbox 리스트를 반환한다.
 
     핵심 수정:
     - DINO는 프롬프트 끝에 마침표(.)가 필요함 → 자동 추가
@@ -300,20 +301,13 @@ def _dino_detect(frame, keyword):
     cv2.imwrite(tmp, frame)
     src, tensor = gdino_load_image(tmp)
 
-    # 단계적 임계값 하향: 높은 정밀도부터 시도
-    thresholds = [
-        (0.35, 0.25),   # 높은 임계값
-        (0.25, 0.20),   # 중간
-        (0.15, 0.15),   # 낮은 임계값
-        (0.10, 0.10),   # 최소 임계값
-    ]
-
-    for box_th, txt_th in thresholds:
-        boxes, logits, phrases = gdino_predict(
-            model, tensor, caption, box_th, txt_th
-        )
-        if len(boxes) > 0:
-            break
+    # '간판+흙'처럼 복합 객체 탐지 시, 간판만 높은 임계값에서 
+    # 먼저 찾아져버리고 루프가 종료(break)되는 문제를 막기 위해
+    # 처음부터 중간~낮은 임계값(0.15) 한 번으로 전체를 탐지합니다.
+    # 낮은 신뢰도의 오탐은 아래 CONF_RATIO 필터링에서 제거됩니다.
+    boxes, logits, phrases = gdino_predict(
+        model, tensor, caption, box_threshold=0.15, text_threshold=0.15
+    )
 
     try:
         os.remove(tmp)
@@ -327,19 +321,34 @@ def _dino_detect(frame, keyword):
             f"  해결: 더 구체적인 영어 키워드 사용 (예: 'red coca cola can')"
         )
 
-    # 최고 신뢰도 박스
-    best_idx = logits.argmax()
-    cx, cy, bw, bh = boxes[best_idx].cpu().numpy()
+    # 신뢰도 필터링: 최고 신뢰도의 89% 미만 제거 로직은 
+    # '간판+흙'처럼 여러 객체를 찾아야 할 때 흙이 짤리는 원인이 됩니다.
+    # 비율을 0.89에서 0.50으로 대폭 낮춰, 주변 부위(흙, 기둥)도 합격하도록 변경합니다.
+    CONF_RATIO = 0.50
+    best_conf = logits.max().item()
+    min_conf = best_conf * CONF_RATIO
+
     h, w = frame.shape[:2]
+    all_bboxes = []
+    for i in range(len(boxes)):
+        conf = logits[i].item()
+        cx, cy, bw, bh = boxes[i].cpu().numpy()
+        x1 = max(0, int((cx - bw / 2) * w))
+        y1 = max(0, int((cy - bh / 2) * h))
+        bw_px = min(int(bw * w), w - x1)
+        bh_px = min(int(bh * h), h - y1)
 
-    x1 = max(0, int((cx - bw / 2) * w))
-    y1 = max(0, int((cy - bh / 2) * h))
-    bw_px = min(int(bw * w), w - x1)
-    bh_px = min(int(bh * h), h - y1)
+        if conf >= min_conf:
+            all_bboxes.append((x1, y1, bw_px, bh_px))
+            log.info(f"DINO ✅ [{len(all_bboxes)}]: ({x1},{y1},{bw_px},{bh_px}) "
+                     f"conf={conf:.3f} '{phrases[i]}'")
+        else:
+            log.info(f"DINO ❌ 필터링: ({x1},{y1},{bw_px},{bh_px}) "
+                     f"conf={conf:.3f} < {min_conf:.3f} (최소 기준)")
 
-    log.info(f"DINO ✅: ({x1},{y1},{bw_px},{bh_px}) "
-             f"conf={logits[best_idx]:.3f} '{phrases[best_idx]}'")
-    return (x1, y1, bw_px, bh_px)
+    log.info(f"DINO 총 {len(all_bboxes)}개 객체 채택 (전체 {len(boxes)}개 중, "
+             f"최소 신뢰도 {min_conf:.3f})")
+    return all_bboxes
 
 
 def _sam_segment(frame, bbox):
@@ -369,26 +378,19 @@ def _sam_segment(frame, bbox):
         predictor = SamPredictor(sam)
         predictor.set_image(rgb)
 
-        # bbox + 내부 fg 포인트로 정밀도 향상
+        # bbox + 내부 중앙 1개 fg 포인트만 사용. 3x3 그리드는 외곽을 파먹거나 배경을 찍어 누끼를 망칠 확률이 높음.
         coords, labels = [], []
-        mx, my = int(w * 0.25), int(h * 0.25)
-        for gi in range(3):
-            for gj in range(3):
-                px = x + mx + int((w - 2 * mx) * gj / 2)
-                py = y + my + int((h - 2 * my) * gi / 2)
-                coords.append([
-                    np.clip(px, 0, fw - 1),
-                    np.clip(py, 0, fh - 1),
-                ])
-                labels.append(1)  # foreground
+        cx, cy = x + w // 2, y + h // 2
+        coords.append([np.clip(cx, 0, fw - 1), np.clip(cy, 0, fh - 1)])
+        labels.append(1)  # foreground
 
-        # 외곽 bg 포인트
-        m = 15
+        # 외곽 bg 포인트 (여유값 20으로 늘림)
+        m = 20
         for bxp, byp in [
-            (x + w // 2, max(0, y - m)),
-            (x + w // 2, min(fh - 1, y + h + m)),
-            (max(0, x - m), y + h // 2),
-            (min(fw - 1, x + w + m), y + h // 2),
+            (cx, max(0, y - m)),
+            (cx, min(fh - 1, y + h + m)),
+            (max(0, x - m), cy),
+            (min(fw - 1, x + w + m), cy),
         ]:
             coords.append([bxp, byp])
             labels.append(0)  # background
@@ -414,40 +416,23 @@ def _sam_segment(frame, bbox):
 
 
 def _refine_mask(mask, frame, bbox):
-    """색상 기반 경계 정제 + 가우시안 스무딩."""
-    # 코어/경계 분리
-    core = cv2.erode(mask, np.ones((9, 9), np.uint8), iterations=3)
-    border = cv2.subtract(mask, core)
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-
-    # 코어 색상 통계
-    cpx = hsv[core > 0]
-    if len(cpx) > 50:
-        h_med = np.median(cpx[:, 0])
-        s_med = np.median(cpx[:, 1])
-        h_std = max(cpx[:, 0].std(), 10)
-        s_std = max(cpx[:, 1].std(), 15)
-
-        bys, bxs = np.where(border > 0)
-        if len(bys) > 0:
-            bhsv = hsv[bys, bxs]
-            hd = np.abs(bhsv[:, 0].astype(float) - h_med)
-            hd = np.minimum(hd, 180 - hd)
-            sd = np.abs(bhsv[:, 1].astype(float) - s_med)
-            far = (hd > h_std * 3) | (sd > s_std * 3)
-            mask[bys[far], bxs[far]] = 0
-
-    # 가우시안 스무딩 → 재이진화
+    """단순 가우시안 스무딩 + 모폴로지.
+    캔(Can) 처럼 반사되거나 여러 색이 있는 다중 색상 객체의 내부를 갉아먹는 색상 기반 필터(HSV) 삭제."""
+    
+    # 너무 강하게 외곽을 깎는 로직(erosion x 2 등)도 완화합니다.
     x, y, w, h = bbox
-    bk = max(5, int(min(w, h) * 0.05)) | 1
+    # 블러 커널 사이즈 (과도한 깎임 방지)
+    bk = max(3, int(min(w, h) * 0.03)) | 1
+    # 짝수면 홀수로 맞춰줍니다 (bk |= 1)
     sm = cv2.GaussianBlur(mask.astype(np.float32) / 255, (bk, bk), 0)
-    _, ref = cv2.threshold((sm * 255).astype(np.uint8), 140, 255, cv2.THRESH_BINARY)
+    _, ref = cv2.threshold((sm * 255).astype(np.uint8), 128, 255, cv2.THRESH_BINARY)
 
-    # 모폴로지
+    # 모폴로지 (닫기-열기, 수축 횟수 1회로 줄임)
     ke = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     ref = cv2.morphologyEx(ref, cv2.MORPH_CLOSE, ke, iterations=1)
-    ref = cv2.morphologyEx(ref, cv2.MORPH_OPEN, ke, iterations=1)
-    ref = cv2.erode(ref, np.ones((3, 3), np.uint8), iterations=2)
+    
+    # 캔 뚜껑/모서리가 날아가지 않도록 살짝만(1px 단위) 파먹기
+    ref = cv2.erode(ref, np.ones((3, 3), np.uint8), iterations=1)
 
     return _largest_cc(ref)
 
@@ -471,41 +456,62 @@ def extract_shadow_map(f1, f2, mask):
     normalized_ratio = raw_ratio / base_ratio
     shadow_map = np.clip(normalized_ratio, 0.0, 1.0)
     
-    shadow_zone = cv2.dilate(mask, np.ones((150, 150), np.uint8), iterations=2)
+    # ── 그림자 탐지 영역 완화 (부드럽고 넓은 그림자) ──
+    # 1) 객체 주변 80px(더 넓게) 그림자 탐지 영역으로 설정
+    shadow_zone = cv2.dilate(mask, np.ones((80, 80), np.uint8), iterations=1)
     shadow_map[shadow_zone == 0] = 1.0
-    shadow_map[mask > 0] = 1.0
-    shadow_map[shadow_map > 0.95] = 1.0
     
-    shadow_map = cv2.GaussianBlur(shadow_map, (15, 15), 0)
+    # 2) 객체 내부는 그림자 아님
+    shadow_map[mask > 0] = 1.0
+    
+    # 3) 마스크 경계 주변 임계값 완화
+    near_mask = cv2.dilate(mask, np.ones((20, 20), np.uint8), iterations=1)
+    near_border = (near_mask > 0) & (mask == 0)
+    shadow_map[near_border & (shadow_map > 0.88)] = 1.0
+    
+    # 4) 전체적으로 임계값 완화: 부드러운 그림자(Soft Shadow) 살림
+    shadow_map[shadow_map > 0.94] = 1.0
+    
+    shadow_map = cv2.GaussianBlur(shadow_map, (25, 25), 0)
     log.info(f"AI 그림자 추출 완료 (base_ratio: {base_ratio:.3f})")
     return shadow_map
 
 def step4_extract(first_frame, generated_frame, keyword):
-    """DINO → SAM → 정제. 폴백 없음."""
-    bbox = _dino_detect(generated_frame, keyword)
-    mask = _sam_segment(generated_frame, bbox)
-    mask = _refine_mask(mask, generated_frame, bbox)
+    """DINO → SAM → 정제. 다중 객체 지원. 폴백 없음."""
+    all_bboxes = _dino_detect(generated_frame, keyword)
 
-    # 그림자 추출
-    shadow_map = extract_shadow_map(first_frame, generated_frame, mask)
+    # 각 bbox에 대해 SAM 세그멘테이션 실행 후 마스크 결합
+    fh, fw = generated_frame.shape[:2]
+    combined_mask = np.zeros((fh, fw), dtype=np.uint8)
+
+    for i, bbox in enumerate(all_bboxes):
+        log.info(f"SAM 세그멘테이션 [{i+1}/{len(all_bboxes)}]: bbox={bbox}")
+        mask_i = _sam_segment(generated_frame, bbox)
+        mask_i = _refine_mask(mask_i, generated_frame, bbox)
+        combined_mask = cv2.bitwise_or(combined_mask, mask_i)
+
+    log.info(f"마스크 결합 완료: {len(all_bboxes)}개 객체")
+
+    # 그림자 추출 (결합된 마스크 기준)
+    shadow_map = extract_shadow_map(first_frame, generated_frame, combined_mask)
 
     # bbox를 결합된 영역(마스크 + 그림자) 기준으로 재계산
     shadow_binary = (shadow_map < 0.98).astype(np.uint8) * 255
-    combined = cv2.bitwise_or(mask, shadow_binary)
+    merged = cv2.bitwise_or(combined_mask, shadow_binary)
 
-    coords = cv2.findNonZero(combined)
+    coords = cv2.findNonZero(merged)
     if coords is not None:
         mx, my, mw, mh = cv2.boundingRect(coords)
-        gh, gw = mask.shape[:2]
+        gh, gw = combined_mask.shape[:2]
         p = 20
         bbox = (max(0, mx - p), max(0, my - p),
                 min(mw + 2 * p, gw - max(0, mx - p)),
                 min(mh + 2 * p, gh - max(0, my - p)))
 
     log.info(f"최종 bbox(그림자 포함): {bbox}")
-    cv2.imwrite(os.path.join(OUTPUTS, "object_mask.png"), mask)
+    cv2.imwrite(os.path.join(OUTPUTS, "object_mask.png"), combined_mask)
     cv2.imwrite(os.path.join(OUTPUTS, "shadow_map.png"), ((1.0 - shadow_map)*255).astype(np.uint8))
-    return mask, shadow_map, bbox
+    return combined_mask, shadow_map, bbox
 
 
 # ══════════════════════════════════════════════════════════════
@@ -559,8 +565,8 @@ def step6_composite(vpath, obj, mr, sr, vbbox, opath):
     fg = obj[oy1:oy2, ox1:ox2].astype(np.float32)
     cm = mr[oy1:oy2, ox1:ox2]
 
-    # 소프트 알파 (3px 가우시안 페더링)
-    alpha = cv2.GaussianBlur(cm.astype(np.float32) / 255, (0, 0), sigmaX=1.5)
+    # 소프트 알파 (외곽선을 부드럽게 풀기 위해 페더링 강화)
+    alpha = cv2.GaussianBlur(cm.astype(np.float32) / 255, (0, 0), sigmaX=3.5)
     inner = cv2.erode(cm, np.ones((3, 3), np.uint8), iterations=1)
     alpha[inner > 0] = 1.0
     alpha = np.clip(alpha, 0, 1)
@@ -572,6 +578,30 @@ def step6_composite(vpath, obj, mr, sr, vbbox, opath):
 
     log.info(f"합성: {vw}×{vh} {fps:.0f}fps {total}f")
 
+    # --- 추가: 깊이 추정(Z-Depth) 모델 적용 ---
+    log.info("Z-Depth 가림(Occlusion) 처리를 위해 Depth Estimation 모델 로딩 (Intel/dpt-large)...")
+    from transformers import pipeline
+    from PIL import Image
+    device_id = 0 if torch.cuda.is_available() else -1
+    depth_estimator = pipeline(task="depth-estimation", model="Intel/dpt-large", device=device_id)
+
+    # --- 첫 프레임 기준 객체의 가상 깊이(Z-Depth) 산출 ---
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+    ret, bg_frame = cap.read()
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # 위치 초기화
+    
+    bg_pil = Image.fromarray(cv2.cvtColor(bg_frame, cv2.COLOR_BGR2RGB))
+    bg_depth_out = depth_estimator(bg_pil)
+    # 크기 조절된 np array (0~255 값. 값이 클수록 카메라에 가까움)
+    bg_depth = np.array(bg_depth_out["depth"].resize((vw, vh), Image.Resampling.BILINEAR))
+    
+    # 합성 물체가 바닥에 닿는 하단 부분(y2 근처)의 깊이를 객체의 베이스(가상) 깊이로 설정
+    # 안정적인 측정을 위해 ROI 내 하단 20px 영역의 중앙값 사용
+    bottom_y_start = max(y1, y2 - 20)
+    base_depth = np.median(bg_depth[bottom_y_start:y2, x1:x2])
+    log.info(f"합성 객체의 추정 Z-Depth 베이스 값: {base_depth:.1f} (0~255)")
+
+
     n = 0
     while True:
         ret, frame = cap.read()
@@ -580,11 +610,43 @@ def step6_composite(vpath, obj, mr, sr, vbbox, opath):
 
         roi = frame[y1:y2, x1:x2].astype(np.float32)
 
-        # (1) AI 그림자를 배경에 적용 (곱하기)
-        roi = roi * s3
+        # ------------------------------------------------------------
+        # Z-Depth 기반 동적 마스킹 (손, 사람 등 모든 프론트 객체) 판별
+        # ------------------------------------------------------------
+        # 현재 프레임의 깊이 맵 추출
+        frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        curr_depth_out = depth_estimator(frame_pil)
+        curr_depth = np.array(curr_depth_out["depth"].resize((vw, vh), Image.Resampling.BILINEAR))
+        
+        # 합성이 일어날 ROI 구역의 깊이 타일
+        roi_depth = curr_depth[y1:y2, x1:x2]
+
+        # 객체보다 카메라에 더 가까운(깊이 값이 더 큰) 픽셀은 가림막(Occlusion) 처리
+        # 오차(Tolerance)를 두어 자연스러운 윤곽선 보장 (+ 5)
+        # 0~255 스케일에서 5 정도의 차이는 꽤 분명한 전경/배경 차이 단서임
+        Depth_Tolerance = 5
+        occlusion_mask = (roi_depth > (base_depth + Depth_Tolerance)).astype(np.float32)
+
+        # 가림막 마스크 경계선을 부드럽게 (알파 블렌딩용 가우시안)
+        occ_float = cv2.GaussianBlur(occlusion_mask.astype(np.float32), (15, 15), 0)
+        occ_3 = np.stack([occ_float]*3, axis=-1)
+
+        # ------------------------------------------------------------
+        # 합성 계산
+        # ------------------------------------------------------------
+        # 원본 알파값(a3)에서 앞을 가리는 부분(occ_3)은 알파값을 깎아냄 (투명화)
+        occluded_a3 = a3 * (1.0 - occ_3)
+
+        # 그림자(s3) 역시 물체 앞을 지나는 것 위에는 생기면 안됨.
+        # s3는 값이 0일수록 어두움(그림자), 1.0에 가까울수록 원본(밝음).
+        # occ_3 가 1.0(가림)인 곳은 그림자 효과를 없애서 1.0으로 만듦
+        occluded_s3 = 1.0 - ((1.0 - s3) * (1.0 - occ_3))
+
+        # (1) AI 그림자를 배경에 적용
+        roi = roi * occluded_s3
 
         # (2) 객체 알파 블렌딩을 그 위에 적용
-        roi = fg * a3 + roi * (1.0 - a3)
+        roi = fg * occluded_a3 + roi * (1.0 - occluded_a3)
 
         frame[y1:y2, x1:x2] = np.clip(roi, 0, 255).astype(np.uint8)
         out.write(frame)
