@@ -16,6 +16,9 @@ KAFKA_CONSUMER_GROUP_ID = os.environ.get("KAFKA_CONSUMER_GROUP_ID", "reppl-gpu")
 KAFKA_TOPIC_JOB_REQUEST = os.environ.get("KAFKA_TOPIC_JOB_REQUEST", "reppl.job.request.v1")
 KAFKA_TOPIC_JOB_PROGRESS = os.environ.get("KAFKA_TOPIC_JOB_PROGRESS", "reppl.job.progress.v1")
 
+# GMS API
+GMS_API_KEY = os.environ.get("GMS_API_KEY", "")
+
 # AWS S3
 AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY", "")
 AWS_SECRET_KEY = os.environ.get("AWS_SECRET_KEY", "")
