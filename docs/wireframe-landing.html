@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VPPL - Landing Page Wireframe</title>
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #ffffff; color: #1a1a1a; }
+
+  /* NAV */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 60px; height: 70px;
+    background: rgba(255,255,255,0.95); border-bottom: 1.5px solid #e0e0e0;
+  }
+  .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: #111; }
+  .logo span { color: #4a6cf7; }
+  .nav-links { display: flex; gap: 36px; }
+  .nav-links a { text-decoration: none; color: #444; font-size: 14px; font-weight: 500; }
+  .nav-cta {
+    background: #1a1a1a; color: #fff; padding: 10px 24px;
+    border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+
+  /* HERO */
+  .hero {
+    margin-top: 70px;
+    position: relative; height: 90vh; background: #0d0d0d;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .hero-video-bg {
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, #0d0d0d 0%, #1a1a2e 50%, #0d0d0d 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hero-video-placeholder {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .video-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 100%);
+  }
+  .play-btn {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.4);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    position: relative; z-index: 2;
+  }
+  .play-btn::after {
+    content: ''; border-left: 26px solid rgba(255,255,255,0.8);
+    border-top: 16px solid transparent; border-bottom: 16px solid transparent;
+    margin-left: 6px;
+  }
+  .video-label {
+    position: absolute; bottom: 32px; left: 0; right: 0; text-align: center;
+    color: rgba(255,255,255,0.4); font-size: 13px; letter-spacing: 2px; text-transform: uppercase;
+    z-index: 2;
+  }
+  .hero-content {
+    position: relative; z-index: 2; text-align: center; max-width: 780px; padding: 0 24px;
+  }
+  .hero-badge {
+    display: inline-block; background: rgba(74,108,247,0.2); border: 1px solid rgba(74,108,247,0.4);
+    color: #7a9cff; padding: 6px 18px; border-radius: 20px; font-size: 13px; font-weight: 600;
+    letter-spacing: 1px; text-transform: uppercase; margin-bottom: 28px;
+  }
+  .hero h1 {
+    font-size: 60px; font-weight: 800; line-height: 1.1; color: #fff; margin-bottom: 24px;
+    letter-spacing: -1.5px;
+  }
+  .hero h1 em { color: #4a6cf7; font-style: normal; }
+  .hero p {
+    font-size: 18px; color: rgba(255,255,255,0.65); line-height: 1.7; margin-bottom: 40px; font-weight: 400;
+  }
+  .hero-actions { display: flex; gap: 16px; justify-content: center; align-items: center; }
+  .btn-primary {
+    background: #4a6cf7; color: #fff; padding: 15px 36px;
+    border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; border: none;
+  }
+  .btn-ghost {
+    background: transparent; color: rgba(255,255,255,0.75); padding: 15px 36px;
+    border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer;
+    border: 1.5px solid rgba(255,255,255,0.25);
+  }
+
+  /* METRICS BAND */
+  .metrics-band {
+    background: #f8f9ff; border-top: 1px solid #e8ebff; border-bottom: 1px solid #e8ebff;
+    padding: 52px 60px;
+    display: flex; justify-content: center; gap: 0;
+  }
+  .metric-item {
+    flex: 1; max-width: 280px; text-align: center;
+    padding: 0 40px; border-right: 1px solid #dde2f7;
+  }
+  .metric-item:last-child { border-right: none; }
+  .metric-num { font-size: 52px; font-weight: 900; color: #4a6cf7; letter-spacing: -2px; }
+  .metric-num sup { font-size: 26px; font-weight: 700; }
+  .metric-label { font-size: 15px; color: #555; margin-top: 6px; font-weight: 500; line-height: 1.5; }
+
+  /* SECTION COMMON */
+  section { padding: 100px 60px; }
+  .section-tag {
+    display: inline-block; background: #eef1ff; color: #4a6cf7;
+    padding: 5px 16px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 20px;
+  }
+  .section-title { font-size: 44px; font-weight: 800; line-height: 1.15; letter-spacing: -1px; color: #111; }
+  .section-sub { font-size: 17px; color: #666; line-height: 1.7; margin-top: 16px; max-width: 560px; }
+  .center { text-align: center; }
+  .section-sub.center { margin: 16px auto 0; }
+
+  /* HOW IT WORKS */
+  .how-section { background: #fff; }
+  .steps-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 64px;
+  }
+  .step-card {
+    border: 1.5px solid #e8ebf5; border-radius: 16px; padding: 40px 32px;
+    position: relative; background: #fff;
+  }
+  .step-num {
+    font-size: 64px; font-weight: 900; color: #eef0fb; line-height: 1;
+    position: absolute; top: 24px; right: 28px; letter-spacing: -3px;
+  }
+  .step-icon {
+    width: 52px; height: 52px; border-radius: 12px; background: #eef1ff;
+    display: flex; align-items: center; justify-content: center; margin-bottom: 20px;
+  }
+  .step-icon svg { width: 26px; height: 26px; color: #4a6cf7; }
+  .step-card h3 { font-size: 20px; font-weight: 700; margin-bottom: 12px; color: #111; }
+  .step-card p { font-size: 15px; color: #666; line-height: 1.7; }
+
+  /* BENEFITS */
+  .benefits-section { background: #0d0d0d; }
+  .benefits-section .section-title { color: #fff; }
+  .benefits-section .section-tag { background: rgba(74,108,247,0.2); color: #7a9cff; }
+  .benefits-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-top: 64px;
+  }
+  .benefit-card {
+    background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 16px; padding: 40px;
+    transition: border-color 0.2s;
+  }
+  .benefit-card:first-child { grid-column: 1 / -1; background: #0f1a3a; border-color: #2a3a6a; }
+  .benefit-icon {
+    width: 48px; height: 48px; border-radius: 10px; background: rgba(74,108,247,0.15);
+    border: 1px solid rgba(74,108,247,0.3); display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px; font-size: 22px;
+  }
+  .benefit-card h3 { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+  .benefit-card p { font-size: 15px; color: #888; line-height: 1.7; }
+  .benefit-stat { font-size: 42px; font-weight: 900; color: #4a6cf7; margin-top: 16px; letter-spacing: -1.5px; }
+
+  /* FOR WHO */
+  .who-section { background: #f5f6ff; }
+  .who-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 64px;
+  }
+  .who-card {
+    background: #fff; border: 1.5px solid #e8ebf5; border-radius: 20px; padding: 44px 32px;
+    text-align: center; position: relative; overflow: hidden;
+  }
+  .who-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, #4a6cf7, #7a9cff);
+  }
+  .who-avatar {
+    width: 72px; height: 72px; border-radius: 50%;
+    background: linear-gradient(135deg, #eef1ff, #d5deff);
+    margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;
+    font-size: 30px;
+  }
+  .who-card h3 { font-size: 19px; font-weight: 700; color: #111; margin-bottom: 12px; }
+  .who-card p { font-size: 14px; color: #666; line-height: 1.7; }
+  .who-tags { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 20px; }
+  .who-tag {
+    background: #eef1ff; color: #4a6cf7; padding: 5px 14px;
+    border-radius: 20px; font-size: 12px; font-weight: 600;
+  }
+
+  /* CTA */
+  .cta-section {
+    background: linear-gradient(135deg, #1a2a6c 0%, #2a4af7 50%, #1a2a6c 100%);
+    text-align: center; padding: 120px 60px;
+  }
+  .cta-section h2 { font-size: 48px; font-weight: 800; color: #fff; margin-bottom: 20px; letter-spacing: -1.5px; }
+  .cta-section p { font-size: 18px; color: rgba(255,255,255,0.7); margin-bottom: 44px; }
+  .cta-btns { display: flex; gap: 16px; justify-content: center; }
+  .btn-white {
+    background: #fff; color: #1a2a6c; padding: 16px 40px;
+    border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; border: none;
+  }
+  .btn-outline-white {
+    background: transparent; color: #fff; padding: 16px 40px;
+    border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.4);
+  }
+
+  /* FOOTER */
+  footer {
+    background: #0a0a0a; padding: 64px 60px 32px;
+    border-top: 1px solid #1a1a1a;
+  }
+  .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; margin-bottom: 48px; }
+  .footer-brand .logo { font-size: 20px; margin-bottom: 16px; display: block; color: #fff; }
+  .footer-brand p { font-size: 14px; color: #555; line-height: 1.7; }
+  .footer-col h4 { font-size: 13px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
+  .footer-col a { display: block; color: #555; font-size: 14px; text-decoration: none; margin-bottom: 12px; }
+  .footer-bottom {
+    border-top: 1px solid #1a1a1a; padding-top: 28px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; color: #444;
+  }
+</style>
+</head>
+<body>
+
+<!-- NAVIGATION -->
+<nav>
+  <div class="logo">VP<span>PL</span></div>
+  <div class="nav-links">
+    <a href="#intro">서비스 소개</a>
+    <a href="#how">작동 방식</a>
+    <a href="#benefits">활용 사례</a>
+    <a href="#who">대상 고객</a>
+    <a href="#contact">문의하기</a>
+  </div>
+  <div class="nav-cta">서비스 바로가기 →</div>
+</nav>
+
+<!-- HERO: Full-bleed video + overlay text -->
+<section class="hero" id="intro">
+  <div class="hero-video-bg">
+    <div class="hero-video-placeholder">
+      <div class="video-overlay"></div>
+      <div class="play-btn"></div>
+      <div class="video-label">▶ &nbsp; Before / After 데모 영상 재생</div>
+    </div>
+  </div>
+  <div class="hero-content">
+    <div class="hero-badge">AI Virtual Product Placement</div>
+    <h1>촬영 없이<br>광고를 <em>삽입</em>하세요</h1>
+    <p>이미 촬영이 완료된 드라마·예능 영상에<br>AI가 상품을 자연스럽게 합성합니다. 재촬영 없이, 빠르게.</p>
+    <div class="hero-actions">
+      <button class="btn-primary" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">작동 방식 보기 →</button>
+      <button class="btn-ghost" onclick="document.getElementById('who').scrollIntoView({behavior:'smooth'})">대상 고객 알아보기</button>
+    </div>
+  </div>
+</section>
+
+<!-- METRICS BAND -->
+<div class="metrics-band">
+  <div class="metric-item">
+    <div class="metric-num"><sup>최대</sup> 80<sup>%</sup></div>
+    <div class="metric-label">광고 집행 비용 절감<br><span style="color:#aaa;font-size:13px">재촬영·세트 대비</span></div>
+  </div>
+  <div class="metric-item">
+    <div class="metric-num"><sup>평균</sup> 3<sup>일</sup></div>
+    <div class="metric-label">광고 삽입 소요 시간<br><span style="color:#aaa;font-size:13px">기존 6~8주 대비</span></div>
+  </div>
+  <div class="metric-item">
+    <div class="metric-num">99<sup>%</sup></div>
+    <div class="metric-label">원본 화질 유지율<br><span style="color:#aaa;font-size:13px">AI 합성 정확도</span></div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section class="how-section" id="how">
+  <div class="center">
+    <div class="section-tag">작동 방식</div>
+    <h2 class="section-title">3단계로 완성되는<br>AI 광고 합성</h2>
+    <p class="section-sub center">복잡한 설정 없이 영상과 상품 이미지만 올리면<br>AI가 나머지를 알아서 처리합니다.</p>
+  </div>
+  <div class="steps-grid">
+    <div class="step-card">
+      <div class="step-num">01</div>
+      <div class="step-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4a6cf7" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <h3>영상 & 상품 업로드</h3>
+      <p>기존 촬영 영상(MP4)과 삽입할 상품 이미지 또는 키워드를 업로드합니다. 별도 소프트웨어 설치가 필요 없습니다.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">02</div>
+      <div class="step-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4a6cf7" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      </div>
+      <h3>AI 자동 분석 & 합성</h3>
+      <p>DINO·SAM·Lucas-Kanade 모델이 장면을 분석하고, 카메라 움직임을 추적하여 상품을 자연스럽게 합성합니다.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">03</div>
+      <div class="step-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4a6cf7" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <h3>결과 영상 다운로드</h3>
+      <p>합성이 완료된 MP4 파일을 즉시 다운로드하거나 방송사·플랫폼에 바로 납품할 수 있습니다.</p>
+    </div>
+  </div>
+</section>
+
+<!-- BENEFITS (Dark) -->
+<section class="benefits-section" id="benefits">
+  <div class="center">
+    <div class="section-tag">비용 & 시간 효과</div>
+    <h2 class="section-title" style="color:#fff">기존 방식과 무엇이<br>다른가요?</h2>
+    <p class="section-sub center" style="color:#888">PPL 재촬영 없이 완성되는 광고 삽입.<br>시간과 예산 모두를 아낍니다.</p>
+  </div>
+  <div class="benefits-grid">
+    <div class="benefit-card">
+      <div class="benefit-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4a6cf7" stroke-width="2" width="22" height="22"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <h3>기존 재촬영 방식 vs VPPL AI 방식</h3>
+      <p>기존 PPL 재촬영은 세트 대관·인력·후반 작업까지 수주~수개월이 소요됩니다.<br>VPPL은 영상 업로드 후 평균 <strong style="color:#4a6cf7">3일 이내</strong> 결과물을 제공합니다.</p>
+      <div style="display:flex; gap:40px; margin-top:28px;">
+        <div>
+          <div style="font-size:13px;color:#666;margin-bottom:6px;">기존 방식</div>
+          <div style="font-size:36px;font-weight:900;color:#555;">6~8주</div>
+          <div style="font-size:13px;color:#555;margin-top:4px;">세트·촬영·후반작업 포함</div>
+        </div>
+        <div style="display:flex;align-items:center;font-size:28px;color:#555;">→</div>
+        <div>
+          <div style="font-size:13px;color:#4a6cf7;margin-bottom:6px;">VPPL AI 방식</div>
+          <div style="font-size:36px;font-weight:900;color:#4a6cf7;">3일</div>
+          <div style="font-size:13px;color:#4a6cf7;margin-top:4px;">업로드 후 결과 수령</div>
+        </div>
+      </div>
+    </div>
+    <div class="benefit-card">
+      <div class="benefit-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4a6cf7" stroke-width="2" width="22" height="22"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <h3>비용 최대 80% 절감</h3>
+      <p>재촬영·세트 대관·배우 섭외 없이 이미 완성된 영상을 활용하여 광고 집행 비용을 대폭 절감합니다.</p>
+      <div class="benefit-stat">- 80%</div>
+    </div>
+    <div class="benefit-card">
+      <div class="benefit-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#4a6cf7" stroke-width="2" width="22" height="22"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      </div>
+      <h3>자연스러운 합성 품질</h3>
+      <p>최신 AI 모델이 카메라 움직임과 조명을 반영하여 육안으로 구분하기 어려운 합성 결과를 제공합니다.</p>
+      <div class="benefit-stat">99%</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOR WHO -->
+<section class="who-section" id="who">
+  <div class="center">
+    <div class="section-tag">사용 대상</div>
+    <h2 class="section-title">누구를 위한 서비스인가요?</h2>
+    <p class="section-sub center">방송사부터 광고대행사, 브랜드 마케터까지<br>영상 광고가 필요한 모든 분들을 위해 만들었습니다.</p>
+  </div>
+  <div class="who-grid">
+    <div class="who-card">
+      <div class="who-avatar">📺</div>
+      <h3>방송사 & OTT 플랫폼</h3>
+      <p>이미 방영된 콘텐츠에 새로운 광고를 삽입하여 추가 수익을 창출하세요. 재방송·VOD 광고 단가를 높입니다.</p>
+      <div class="who-tags">
+        <span class="who-tag">KBS / MBC / SBS</span>
+        <span class="who-tag">Netflix / Wavve</span>
+        <span class="who-tag">재방송 수익화</span>
+      </div>
+    </div>
+    <div class="who-card">
+      <div class="who-avatar">🎬</div>
+      <h3>광고 대행사</h3>
+      <p>광고주 요청이 촬영 이후에 들어와도 문제없습니다. 기존 영상 자산을 활용하여 빠르게 캠페인을 집행하세요.</p>
+      <div class="who-tags">
+        <span class="who-tag">캠페인 신속 집행</span>
+        <span class="who-tag">비용 효율화</span>
+        <span class="who-tag">A/B 테스트</span>
+      </div>
+    </div>
+    <div class="who-card">
+      <div class="who-avatar">🏢</div>
+      <h3>브랜드 마케터</h3>
+      <p>인기 드라마·예능의 특정 장면에 자사 제품을 자연스럽게 녹여내어 브랜드 인지도를 효과적으로 높이세요.</p>
+      <div class="who-tags">
+        <span class="who-tag">브랜드 인지도</span>
+        <span class="who-tag">PPL 효과 극대화</span>
+        <span class="who-tag">타겟 노출</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA SECTION -->
+<section class="cta-section" id="contact">
+  <h2>도입 문의하기</h2>
+  <p>VPPL의 AI 합성 기술을 귀사의 영상 자산에 적용하고 싶으시다면<br>언제든지 문의 주세요. 빠르게 답변 드립니다.</p>
+  <div class="cta-btns">
+    <button class="btn-white">문의 남기기 →</button>
+    <button class="btn-outline-white" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">작동 방식 다시 보기</button>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <span class="logo">VP<span style="color:#4a6cf7">PL</span></span>
+      <p>AI 기반 가상 PPL 합성 서비스.<br>이미 촬영된 영상에 상품을 자연스럽게 삽입합니다.</p>
+    </div>
+    <div class="footer-col">
+      <h4>서비스</h4>
+      <a href="#how">작동 방식</a>
+      <a href="#benefits">활용 사례</a>
+      <a href="#who">대상 고객</a>
+      <a href="#contact">문의하기</a>
+    </div>
+    <div class="footer-col">
+      <h4>회사</h4>
+      <a href="#">소개</a>
+      <a href="#">블로그</a>
+      <a href="#">채용</a>
+      <a href="#">문의</a>
+    </div>
+    <div class="footer-col">
+      <h4>법적 고지</h4>
+      <a href="#">이용약관</a>
+      <a href="#">개인정보처리방침</a>
+      <a href="#">저작권 안내</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2025 VPPL Inc. All rights reserved.</span>
+    <span>삼성 청년 SW 아카데미 S14 · A401팀</span>
+  </div>
+</footer>
+
+</body>
+</html>
