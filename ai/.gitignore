@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Environments
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Directories containing dynamically generated/downloaded content
+outputs/
+# inputs/  # 필요시 주석 해제 (샘플 데이터가 아닌 대용량 원본 데이터일 경우)
+
+# IDE
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# === AI 대용량 파일 (Git LFS로 관리 권장) ===
+# 아래 확장자들은 기본적으로 Git 추적을 무시하고, Git LFS를 통해 관리하기를 권장합니다.
+# git lfs track "*.pt" 등의 명령어를 통해 LFS로 관리하세요.
+# 만약 LFS를 사용하지 않고 단순히 제외하고 싶다면 아래 주석을 해제하세요.
+
+# *.pt
+# *.pth
+# *.onnx
+# *.tflite
+# *.h5
+# *.weights
+# *.safetensors

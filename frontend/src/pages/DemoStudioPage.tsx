@@ -1,126 +1,160 @@
-import { FormEvent, useMemo, useState } from 'react';
 import { NavBar } from '../components/NavBar';
+import { JobCreateForm } from '../components/studio/JobCreateForm';
+import { JobListPanel } from '../components/studio/JobListPanel';
+import { useScrollReveal } from '../hooks/useScrollReveal';
+import { useDemoJobs } from '../hooks/useDemoJobs';
 
-type Job = {
-  id: number;
-  videoName: string;
-  brand: string;
-  status: '분석중' | '합성중' | '완료';
-  eta: string;
-};
-
-const statusStyle: Record<Job['status'], string> = {
-  분석중: 'text-sky-700',
-  합성중: 'text-amber-600',
-  완료: 'text-emerald-600'
-};
+const pipelineSteps = [
+  {
+    icon: '📥',
+    title: '입력 수집',
+    description: '원본 동영상과 삽입할 물체 사진, 배치 위치 설명을 입력합니다.',
+  },
+  {
+    icon: '🎯',
+    title: '첫 프레임 삽입',
+    description: 'NanoBanana 엔진이 프롬프트에 맞춰 첫 프레임에 물체를 정밀 배치합니다.',
+  },
+  {
+    icon: '🎬',
+    title: '전체 영상 합성',
+    description: '첫 프레임을 기준으로 전체 영상에 자연스럽게 합성하고 그림자를 추가합니다.',
+  },
+];
 
 export function DemoStudioPage() {
-  const [videoName, setVideoName] = useState('');
-  const [brand, setBrand] = useState('');
-  const [jobs, setJobs] = useState<Job[]>([
-    { id: 1, videoName: 'vlog_episode_08.mp4', brand: 'Coca-Cola Can', status: '완료', eta: '완료됨' },
-    { id: 2, videoName: 'studio_talk_021.mp4', brand: 'Sprite PET', status: '합성중', eta: '약 18분' }
-  ]);
+  const pageRef = useScrollReveal<HTMLDivElement>();
+  const { jobs, running, loadingJobs, errorMessage, setErrorMessage, prependCreatedJob, downloadResult } = useDemoJobs();
+  const completed = jobs.filter((job) => job.status === 'COMPLETED').length;
 
-  const running = useMemo(() => jobs.filter((job) => job.status !== '완료').length, [jobs]);
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!videoName || !brand) {
-      return;
+  const handleDownload = async (jobId: string) => {
+    try {
+      await downloadResult(jobId);
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : '결과 다운로드 URL 조회에 실패했습니다.');
     }
-
-    const nextJob: Job = {
-      id: Date.now(),
-      videoName,
-      brand,
-      status: '분석중',
-      eta: '약 30분'
-    };
-
-    setJobs((prev) => [nextJob, ...prev]);
-    setVideoName('');
-    setBrand('');
   };
 
   return (
-    <div className="home-light min-h-screen text-slate-900">
+    <div className="page-dark" ref={pageRef}>
       <NavBar />
-      <main className="mx-auto max-w-6xl px-6 py-10">
-        <section className="animate-on-scroll mb-6">
-          <span className="light-pill">Studio</span>
-          <h1 className="mt-4 text-4xl font-black tracking-tight">작업 시작</h1>
-        </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <div className="light-metric-card text-left">
-            <p className="text-sm text-slate-500">진행 중 작업</p>
-            <p className="mt-2 text-2xl font-black text-sky-600">{running}건</p>
+      {/* ════════════ Hero ════════════ */}
+      <section className="hero">
+        <div className="hero-content animate-on-scroll">
+          <span className="hero-tag">
+            <span style={{ fontSize: '0.85rem' }}>✦</span>
+            AI-Powered Virtual Product Placement
+          </span>
+
+          <h1 className="hero-title">
+            촬영 끝난 영상에
+            <br />
+            <span className="gradient">제품을 자연스럽게 삽입</span>합니다
+          </h1>
+
+          <p className="hero-subtitle">
+            원본 동영상과 제품 이미지만 업로드하세요.
+            AI가 첫 프레임에 물체를 배치하고, 전체 영상으로 확장하며
+            그림자까지 자연스럽게 합성합니다.
+          </p>
+
+          <div className="hero-actions">
+            <a href="#workspace" className="btn-primary">
+              작업 시작하기 →
+            </a>
+            <a href="#pipeline" className="btn-ghost">
+              파이프라인 보기
+            </a>
           </div>
-          <div className="light-metric-card text-left">
-            <p className="text-sm text-slate-500">데모 크레딧</p>
-            <p className="mt-2 text-2xl font-black text-sky-600">120 Credits</p>
-          </div>
-          <div className="light-metric-card text-left">
-            <p className="text-sm text-slate-500">평균 처리 시간</p>
-            <p className="mt-2 text-2xl font-black text-sky-600">24h 이내</p>
-          </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.1fr]">
-          <form onSubmit={handleSubmit} className="light-slide-card">
-            <h2 className="text-2xl font-black text-slate-900">새 VPP 작업 요청</h2>
-
-            <div className="mt-6 space-y-4">
-              <label className="block text-sm">
-                <span className="mb-2 block text-slate-600">원본 영상 파일명</span>
-                <input
-                  type="text"
-                  value={videoName}
-                  onChange={(e) => setVideoName(e.target.value)}
-                  placeholder="ex) creator_vlog_032.mp4"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none ring-sky-400 transition focus:ring"
-                />
-              </label>
-              <label className="block text-sm">
-                <span className="mb-2 block text-slate-600">삽입할 음료 브랜드</span>
-                <input
-                  type="text"
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  placeholder="ex) Pepsi Zero Can"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none ring-sky-400 transition focus:ring"
-                />
-              </label>
-            </div>
-
-            <button
-              type="submit"
-              className="mt-6 w-full rounded-xl bg-sky-500 px-4 py-3 font-black text-white transition hover:bg-sky-600"
+      {/* ════════════ Pipeline ════════════ */}
+      <section id="pipeline" className="pipeline-section">
+        <div className="pipeline-grid">
+          {pipelineSteps.map((step, index) => (
+            <div
+              key={step.title}
+              className={`animate-on-scroll delay-${index + 1} pipeline-card`}
             >
-              분석 큐에 작업 추가
-            </button>
-          </form>
+              <div className="pipeline-icon" style={{ animation: `float 4s ease-in-out ${index * 0.3}s infinite` }}>
+                {step.icon}
+              </div>
+              <div className="pipeline-num">{index + 1}</div>
+              <h3>{step.title}</h3>
+              <p>{step.description}</p>
 
-          <section className="light-slide-card">
-            <h2 className="text-2xl font-black text-slate-900">작업 현황</h2>
-            <div className="mt-5 space-y-3">
-              {jobs.map((job) => (
-                <article key={job.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-bold text-slate-800">{job.videoName}</p>
-                    <span className={`text-sm font-black ${statusStyle[job.status]}`}>{job.status}</span>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-600">브랜드: {job.brand}</p>
-                  <p className="mt-1 text-xs text-slate-500">예상 완료: {job.eta}</p>
-                </article>
-              ))}
+              {index < pipelineSteps.length - 1 && (
+                <div className="pipeline-arrow">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M5 12h14" />
+                    <path d="m12 5 7 7-7 7" />
+                  </svg>
+                </div>
+              )}
             </div>
-          </section>
-        </section>
-      </main>
+          ))}
+        </div>
+      </section>
+
+      <hr className="section-divider" />
+
+      {/* ════════════ Stats ════════════ */}
+      <div className="stats-strip" style={{ marginTop: '2.5rem' }}>
+        {[
+          { value: running, label: '진행 중', color: 'text-cyan-400' },
+          { value: completed, label: '완료', color: 'text-emerald-400' },
+          { value: jobs.length, label: '전체 작업', color: 'text-violet-400' },
+          { value: jobs.length > 0 ? `${Math.round((completed / jobs.length) * 100)}%` : '0%', label: '성공률', color: 'text-amber-400' },
+        ].map((s) => (
+          <div key={s.label} className="animate-on-scroll stat-card">
+            <p className={`stat-value ${s.color}`}>{s.value}</p>
+            <p className="stat-label">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ════════════ Workspace ════════════ */}
+      <section id="workspace" className="workspace-section">
+        <div className="workspace-header animate-on-scroll">
+          <h2>워크스페이스</h2>
+          <p>파일을 업로드하고, 배치 위치를 설명한 뒤 합성을 시작하세요.</p>
+        </div>
+
+        <div className="workspace-grid">
+          <div className="space-y-5">
+            <div className="animate-on-scroll delay-1">
+              <JobCreateForm onCreated={prependCreatedJob} onError={setErrorMessage} />
+              {errorMessage && (
+                <p className="mt-3 text-sm" style={{ color: 'var(--rose)' }}>{errorMessage}</p>
+              )}
+            </div>
+
+            {/* Prompt Guide */}
+            <section className="animate-on-scroll delay-3 glass-card">
+              <p className="text-xs font-bold uppercase tracking-[0.15em]" style={{ color: 'var(--accent)' }}>
+                프롬프트 가이드
+              </p>
+              <h3 className="mt-2 text-lg font-extrabold" style={{ color: 'var(--text-primary)' }}>
+                위치 설명은 장면 기준으로 구체적으로
+              </h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="guide-chip">테이블 오른쪽 위 컵 옆</span>
+                <span className="guide-chip">손 앞쪽 그림자가 자연스럽게</span>
+                <span className="guide-chip">바닥 접지감 유지</span>
+              </div>
+              <p className="mt-3 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>
+                장면 기준 위치, 가려짐, 그림자 방향까지 함께 적으면 첫 프레임 프롬프트 품질을 높일 수 있습니다.
+              </p>
+            </section>
+          </div>
+
+          <div className="animate-on-scroll delay-2">
+            <JobListPanel jobs={jobs} loadingJobs={loadingJobs} onDownload={handleDownload} />
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
