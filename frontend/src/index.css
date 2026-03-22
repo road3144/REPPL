@@ -993,3 +993,21 @@ h6 {
     transform: translateY(-6px);
   }
 }
+
+/* ── Toast slide-up ── */
+@keyframes slideUpToast {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* ── Toast auto-dismiss progress bar ── */
+@keyframes shrinkBar {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+/* ── Candidate drawer slide-in from right ── */
+@keyframes slideInDrawer {
+  from { transform: translateX(48px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
