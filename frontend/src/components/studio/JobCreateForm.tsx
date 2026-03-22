@@ -11,6 +11,9 @@ import {
 type JobCreateFormProps = {
   onCreated: (status: JobStatusResponse) => void;
   onError: (message: string | null) => void;
+  /** If provided, called after upload completes instead of proceeding to createJob */
+  onUploaded?: (videoKey: string, imageKey: string, prompt: string) => void;
+  className?: string;
 };
 
 const examplePrompts = [
@@ -22,13 +25,13 @@ const examplePrompts = [
 
 type SubmitStage = 'idle' | 'uploading-video' | 'uploading-image' | 'creating-job';
 const stageLabel: Record<SubmitStage, string> = {
-  idle: '합성 작업 큐에 추가',
+  idle: 'AI 분석 시작',
   'uploading-video': '영상 업로드 중...',
   'uploading-image': '이미지 업로드 중...',
   'creating-job': '작업 생성 중...',
 };
 
-export function JobCreateForm({ onCreated, onError }: JobCreateFormProps) {
+export function JobCreateForm({ onCreated, onError, onUploaded, className }: JobCreateFormProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [refImageFile, setRefImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -113,6 +116,18 @@ export function JobCreateForm({ onCreated, onError }: JobCreateFormProps) {
       if (!uploadedRefImage) throw new Error('삽입 이미지 업로드 URL 조회에 실패했습니다.');
       await uploadWithPresignedUrl(refImageFile, uploadedRefImage);
 
+      // If parent wants to handle candidate selection first, stop here
+      if (onUploaded) {
+        onUploaded(videoUpload.upload.video.key, uploadedRefImage.key, trimmedPlacementPrompt);
+        setVideoFile(null);
+        setRefImageFile(null);
+        setPlacementPrompt('');
+        if (imagePreview) { URL.revokeObjectURL(imagePreview); setImagePreview(null); }
+        if (videoInputRef.current) videoInputRef.current.value = '';
+        if (refImageInputRef.current) refImageInputRef.current.value = '';
+        return;
+      }
+
       setStage('creating-job');
       const created = await createJob({
         videoKey: videoUpload.upload.video.key,
@@ -136,7 +151,7 @@ export function JobCreateForm({ onCreated, onError }: JobCreateFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="light-slide-card">
+    <form onSubmit={handleSubmit} className={className ?? 'light-slide-card'}>
       <h2 className="text-2xl font-black text-slate-900">새 삽입 작업</h2>
       <p className="mt-2 text-sm leading-6 text-slate-500">
         동영상과 물체 사진을 업로드하고 배치 위치를 설명하세요.

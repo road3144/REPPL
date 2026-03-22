@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RE:PPL - Landing Page Wireframe</title>
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #09090b; color: #fff; height: 100vh; overflow: hidden; position: relative; }
+
+  /* FULLSCREEN VIDEO BG */
+  .video-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, #0a0a14 0%, #111128 40%, #0a0a14 100%);
+    z-index: 0;
+  }
+  /* scan-line texture */
+  .video-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(255,255,255,0.015) 3px,
+      rgba(255,255,255,0.015) 4px
+    );
+    pointer-events: none;
+  }
+  /* subtle vignette */
+  .video-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.55) 100%);
+    pointer-events: none;
+  }
+
+  /* LOGO — top-left overlay */
+  .top-logo {
+    position: absolute;
+    top: 28px;
+    left: 48px;
+    z-index: 10;
+  }
+  .logo-text { font-size: 24px; font-weight: 900; letter-spacing: -0.5px; color: #fff; }
+  .logo-text span { color: #4a6cf7; }
+
+  /* CENTER OVERLAY */
+  .center-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 36px;
+  }
+
+  /* Play button */
+  .play-btn {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    background: rgba(74,108,247,0.22);
+    border: 2px solid rgba(74,108,247,0.55);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+  }
+  .play-btn::after {
+    content: '';
+    border-left: 30px solid rgba(255,255,255,0.92);
+    border-top: 18px solid transparent;
+    border-bottom: 18px solid transparent;
+    margin-left: 7px;
+  }
+
+  .video-label {
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.3);
+    white-space: nowrap;
+  }
+
+  /* CTA BUTTON */
+  .cta-btn {
+    display: inline-block;
+    padding: 18px 56px;
+    background: #4a6cf7;
+    color: #fff;
+    border-radius: 12px;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    cursor: pointer;
+    box-shadow: 0 8px 32px rgba(74,108,247,0.4);
+  }
+
+  /* FOOTER — bottom overlay */
+  footer {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 10;
+    padding: 18px 48px;
+    text-align: center;
+    font-size: 12px;
+    color: rgba(255,255,255,0.18);
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+</style>
+</head>
+<body>
+
+  <!-- FULLSCREEN VIDEO BG -->
+  <div class="video-bg"></div>
+
+  <!-- LOGO -->
+  <div class="top-logo">
+    <span class="logo-text">RE:<span>PPL</span></span>
+  </div>
+
+  <!-- CENTER: play + label + CTA -->
+  <div class="center-overlay">
+    <div class="play-btn"></div>
+    <span class="video-label">▶ &nbsp; Before / After 데모 영상</span>
+    <div class="cta-btn">서비스 바로가기 →</div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>© 2025 RE:PPL · 삼성 청년 SW 아카데미 S14 · A401팀</footer>
+
+</body>
+</html>
