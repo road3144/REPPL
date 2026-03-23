@@ -9,6 +9,21 @@ export function LandingPageSimple() {
         position: 'absolute', inset: 0,
         background: 'linear-gradient(160deg, #0a0a14 0%, #111128 40%, #0a0a14 100%)',
       }}>
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          }}
+        >
+          <source src="/videos/test_video.mp4" type="video/mp4" />
+        </video>
         {/* scan-line texture */}
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
@@ -23,41 +38,36 @@ export function LandingPageSimple() {
 
       {/* Logo — top-left overlay */}
       <div style={{ position: 'absolute', top: 28, left: 48, zIndex: 10 }}>
-        <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 22, fontWeight: 900, letterSpacing: '-0.5px', color: '#fff' }}>
-          RE:<span style={{ color: '#4a6cf7' }}>PPL</span>
+        <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 900, letterSpacing: '-0.5px', color: '#fff' }}>
+          Re:<span style={{ color: '#4a6cf7' }}>PPL</span>
         </span>
       </div>
 
-      {/* Center overlay */}
+      {/* Top-right CTA */}
       <div style={{
-        position: 'absolute', inset: 0, zIndex: 5,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32,
+        position: 'absolute',
+        top: 28,
+        right: 48,
+        zIndex: 10,
+        display: 'flex',
+        alignItems: 'center',
       }}>
-        {/* Play button */}
-        <div style={{
-          width: 88, height: 88, borderRadius: '50%', cursor: 'pointer',
-          background: 'rgba(74,108,247,0.22)', border: '2px solid rgba(74,108,247,0.55)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backdropFilter: 'blur(4px)',
-        }}>
-          <div style={{
-            borderLeft: '30px solid rgba(255,255,255,0.92)',
-            borderTop: '18px solid transparent', borderBottom: '18px solid transparent',
-            marginLeft: 7,
-          }} />
-        </div>
-
-        <p style={{ fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>
-          ▶ &nbsp; Before / After 데모 영상
-        </p>
-
         <Link
           to="/studio"
           style={{
-            display: 'inline-block', padding: '18px 56px',
-            background: '#4a6cf7', color: '#fff', borderRadius: 12,
-            fontSize: 17, fontWeight: 800, letterSpacing: '-0.3px',
-            textDecoration: 'none', boxShadow: '0 8px 32px rgba(74,108,247,0.4)',
+            display: 'inline-block',
+            padding: '11px 20px',
+            background: 'rgba(9,9,11,0.56)',
+            color: 'rgba(255,255,255,0.92)',
+            borderRadius: 999,
+            border: '1px solid rgba(255,255,255,0.14)',
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: '-0.2px',
+            lineHeight: 1.2,
+            textDecoration: 'none',
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.28)',
           }}
         >
           서비스 바로가기 →
@@ -68,7 +78,9 @@ export function LandingPageSimple() {
       <footer style={{
         position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10,
         textAlign: 'center', padding: '16px 48px', fontSize: 12,
-        color: 'rgba(255,255,255,0.18)', borderTop: '1px solid rgba(255,255,255,0.06)',
+        color: 'rgba(255,255,255,0.52)',
+        textShadow: '0 1px 8px rgba(0,0,0,0.45)',
+        borderTop: '1px solid rgba(255,255,255,0.08)',
       }}>
         © 2025 RE:PPL · 삼성 청년 SW 아카데미 S14 · A401팀
       </footer>
