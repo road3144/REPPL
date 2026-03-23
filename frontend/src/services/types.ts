@@ -95,13 +95,3 @@ export type PreviewSelectResponse = {
   compositeJobId: string;
   status: string;
 };
-
-// ── Candidate (mock) ──
-
-export type CandidateFrame = {
-  id: string;
-  color: string;
-  timestampLabel: string;
-  description: string;
-  confidence: number;
-};

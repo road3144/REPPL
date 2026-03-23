@@ -1,6 +1,5 @@
 import { apiFetch } from './fetchClient';
 import type {
-  CandidateFrame,
   JobCreateResponse,
   JobListResponse,
   JobResultResponse,
@@ -49,15 +48,4 @@ export async function selectPreview(jobId: string, selectedIndex: number): Promi
     method: 'POST',
     body: JSON.stringify({ selectedIndex }),
   });
-}
-
-// ── Candidate (mock) ──
-
-export async function getCandidateFrames(_videoKey: string): Promise<CandidateFrame[]> {
-  await new Promise((r) => setTimeout(r, 1500));
-  return [
-    { id: 'A', color: 'linear-gradient(135deg, #0f1a1a, #0d2e1a)', timestampLabel: '장면 A · 00:34', description: '자연스러운 배치', confidence: 94 },
-    { id: 'B', color: 'linear-gradient(135deg, #1a0f1a, #2e0d28)', timestampLabel: '장면 B · 01:12', description: '주목도 높음', confidence: 89 },
-    { id: 'C', color: 'linear-gradient(135deg, #1a1a0f, #2a2e0d)', timestampLabel: '장면 C · 02:05', description: '클로즈업 구도', confidence: 82 },
-  ];
 }

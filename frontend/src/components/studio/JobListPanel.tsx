@@ -1,4 +1,4 @@
-import { TrackedJob } from '../../hooks/useDemoJobs';
+import { TrackedJob } from '../../hooks/useJobs';
 import { formatStage } from '../../constants/stage';
 
 type JobListPanelProps = {
