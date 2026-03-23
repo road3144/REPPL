@@ -1,7 +1,7 @@
 """
 영상 이미지 합성 파이프라인 v3 + Gemini API 연동
 =================================================
-Grounding DINO + SAM 강제 파이프라인 + Gemini 2.5 Flash Image API.
+Grounding DINO + SAM 강제 파이프라인 + Gemini 3.1 Flash Image Preview (Nano Banana 2) API.
 
 사용법:
   1) inputs/ 폴더에 영상(.mp4)과 합성할 이미지(.png/.jpg)를 넣는다.
@@ -13,7 +13,7 @@ Grounding DINO + SAM 강제 파이프라인 + Gemini 2.5 Flash Image API.
   pip install opencv-python numpy torch torchvision
   pip install groundingdino-py
   pip install segment-anything   (또는 pip install sam-2)
-  pip install requests python-dotenv
+  pip install python-dotenv google-genai
 """
 
 import cv2
@@ -22,12 +22,12 @@ import os
 import re
 import sys
 import logging
-import base64
-import json
-import requests
 import glob
 from io import BytesIO
 from PIL import Image as PILImage
+
+from google import genai
+from google.genai import types
 
 try:
     if hasattr(sys.stdin, "reconfigure"):
@@ -40,6 +40,13 @@ except Exception:
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
+
 # ── .env 로드 ──
 try:
     from dotenv import load_dotenv
@@ -47,9 +54,33 @@ try:
 except ImportError:
     pass  # dotenv 없으면 환경변수에서 직접 읽기
 
-GMS_API_KEY = os.environ.get("GMS_API_KEY", "")
-GMS_BASE = "https://gms.ssafy.io/gmsapi/generativelanguage.googleapis.com/v1beta/models/"
-GEMINI_URL = GMS_BASE + "gemini-2.5-flash-image:generateContent"
+GEMINI_MODEL = "gemini-3.1-flash-image-preview"
+
+# ── Gemini 클라이언트 초기화 ──
+# 우선순위: Vertex AI (일일 할당량 없음) > API Key (무료 일일 한도 있음)
+_GCP_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+_GCP_LOCATION = os.environ.get("GOOGLE_CLOUD_LOCATION", "global")
+_GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+gemini_client = None
+_USE_VERTEX = False
+
+if _GCP_PROJECT:
+    # Vertex AI 모드: 일일 할당량 없음, 크레딧 차감 방식
+    # 사전 필요: gcloud auth application-default login
+    gemini_client = genai.Client(
+        vertexai=True,
+        project=_GCP_PROJECT,
+        location=_GCP_LOCATION,
+    )
+    _USE_VERTEX = True
+    log.info(f"Gemini: Vertex AI 모드 (project={_GCP_PROJECT}, location={_GCP_LOCATION})")
+elif _GEMINI_API_KEY:
+    # Developer API 모드: 무료 일일 한도 있음
+    gemini_client = genai.Client(api_key=_GEMINI_API_KEY)
+    log.info("Gemini: Developer API 모드 (⚠️ 무료 일일 할당량 제한 있음)")
+else:
+    log.warning("Gemini: API 설정 없음 — .env에 GOOGLE_CLOUD_PROJECT 또는 GEMINI_API_KEY를 설정하세요.")
 
 # ── 필수 임포트 ──
 import torch
@@ -82,13 +113,6 @@ if not _SAM2 and not _SAM1:
         "  pip install segment-anything\n"
         "  또는 pip install sam-2"
     )
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-)
-log = logging.getLogger(__name__)
 
 # ── 경로 자동 탐색 ──
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -296,10 +320,9 @@ def step2_auto_detect(user_prompt):
 
     # DINO 키워드 추출 (이미지 파일명에서 추출 시도 → 실패 시 "object")
     stem = os.path.splitext(os.path.basename(obj_img_path))[0]
-    # 파일명에서 숫자/특수문자 제거하고 키워드화
     kw_from_file = re.sub(r'[_\-\d]+', ' ', stem).strip()
 
-    # 한국어 → 영어 매핑 (사용자 프롬프트에서도 추출 시도)
+    # 한국어 → 영어 매핑 (DINO 검색용)
     _KO_EN = {
         "코카콜라": "coca cola can", "콜라": "cola can", "콜라캔": "cola can",
         "사과": "apple", "사과주스": "apple juice can", "에이드": "ade can",
@@ -307,6 +330,8 @@ def step2_auto_detect(user_prompt):
         "시계": "wall clock", "물병": "water bottle",
         "커피": "coffee cup", "맥주": "beer can",
         "컵": "cup", "접시": "plate", "꽃병": "vase",
+        "막걸리": "makgeolli bottle", "소주": "soju bottle",
+        "와인": "wine bottle", "주스": "juice bottle",
     }
 
     kw = ""
@@ -325,19 +350,18 @@ def step2_auto_detect(user_prompt):
 # ======================================================================
 # STEP 3 — Gemini API 호출 (changed_first_frame.png 생성)
 # ======================================================================
-def _cv2_to_base64_jpeg(img, quality=85, max_side=1024):
-    """OpenCV 이미지를 축소+JPEG 압축하여 base64로 변환."""
+def _cv2_to_pil(img, max_side=1024):
+    """OpenCV BGR 이미지를 리사이즈하여 PIL Image로 변환."""
     h, w = img.shape[:2]
     if max(h, w) > max_side:
         scale = max_side / max(h, w)
         img = cv2.resize(img, (int(w * scale), int(h * scale)),
                          interpolation=cv2.INTER_AREA)
-    _, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, quality])
-    return base64.standard_b64encode(buf.tobytes()).decode("utf-8")
+    return PILImage.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
 
 
-def _file_to_base64_jpeg(path, quality=85, max_side=512):
-    """파일에서 이미지 읽어 base64 JPEG (알파채널 흰배경 합성)."""
+def _load_obj_as_pil(path, max_side=512):
+    """파일에서 객체 이미지를 읽어 PIL Image로 변환 (알파채널 흰배경 합성)."""
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
     if img is None:
         raise IOError(f"이미지 로드 실패: {path}")
@@ -348,12 +372,94 @@ def _file_to_base64_jpeg(path, quality=85, max_side=512):
         img = (rgb * alpha + white * (1.0 - alpha)).astype(np.uint8)
     elif img.ndim == 2:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    return _cv2_to_base64_jpeg(img, quality, max_side)
+    return _cv2_to_pil(img, max_side)
 
 
-def step3_gemini(video_path, obj_img_path, kw):
+def _pil_to_cv2(pil_img):
+    """PIL Image를 OpenCV BGR ndarray로 변환."""
+    # RGBA → RGB 변환 (알파 채널 제거)
+    if pil_img.mode == "RGBA":
+        pil_img = pil_img.convert("RGB")
+    elif pil_img.mode != "RGB":
+        pil_img = pil_img.convert("RGB")
+    arr = np.array(pil_img, dtype=np.uint8)
+    return cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+
+
+def _extract_image_from_response(response):
+    """Gemini 응답에서 이미지를 추출하여 PIL Image로 반환한다."""
+    for part in response.candidates[0].content.parts:
+        if part.inline_data is not None:
+            img = PILImage.open(BytesIO(part.inline_data.data))
+            return img
+    return None
+
+
+def _build_gemini_prompt(kw, w1, h1, user_prompt):
+    """Gemini에 전달할 이미지 합성 프롬프트를 생성한다. 사용자 원문을 직접 전달."""
+    return (
+        f"I am giving you two images.\n"
+        f"Image 1: a {w1}x{h1} LANDSCAPE background photo.\n"
+        f"Image 2: the object to overlay (a {kw}).\n"
+        f"\n"
+        f"===== USER REQUEST (in Korean) =====\n"
+        f"\"{user_prompt}\"\n"
+        f"\n"
+        f"===== ABSOLUTE RULE: PRESERVE THE ORIGINAL IMAGE =====\n"
+        f"Image 1 is the SACRED BACKGROUND. Every single pixel of Image 1 that is NOT "
+        f"covered by the new object MUST remain EXACTLY the same — no color shifts, "
+        f"no texture changes, no added/removed furniture, no modified floors, walls, "
+        f"tiles, people, lighting, or any other element. "
+        f"If you compare the output with Image 1, the ONLY difference should be "
+        f"the newly added {kw}.\n"
+        f"\n"
+        f"===== TASK =====\n"
+        f"Read the user's Korean request above. It specifies WHERE to place the {kw}. "
+        f"Composite the {kw} from Image 2 onto Image 1 at the EXACT location "
+        f"described in the user request.\n"
+        f"\n"
+        f"===== PLACEMENT =====\n"
+        f"- Interpret the user's Korean placement description precisely.\n"
+        f"- Match the perspective, lighting, and scale of Image 1.\n"
+        f"- Add a small natural shadow beneath the {kw} only.\n"
+        f"\n"
+        f"===== STRICT PROHIBITIONS =====\n"
+        f"- Do NOT alter, repaint, recolor, or regenerate ANY part of Image 1.\n"
+        f"- Do NOT add new furniture, tiles, patterns, or surfaces.\n"
+        f"- Do NOT change the floor, walls, background, or any existing objects.\n"
+        f"- Do NOT change people's appearance, clothing, or positions.\n"
+        f"- Do NOT crop, rotate, or change to portrait orientation.\n"
+        f"- The output MUST be {w1}x{h1} LANDSCAPE, identical to Image 1 except for the added {kw}."
+    )
+
+
+def _parse_rate_limit_error(error_msg):
     """
-    Gemini API 호출 → changed_first_frame.png 직접 저장 → (f1, f2) 반환.
+    429 에러를 분석하여 (is_daily_exhausted, retry_seconds) 를 반환한다.
+    - is_daily_exhausted: True면 일일 한도 소진 (Developer API 전용, 재시도 무의미)
+    - retry_seconds: API가 권장하는 대기시간
+    Vertex AI 모드에서는 일일 한도가 없으므로 항상 분당 제한만 해당.
+    """
+    err = str(error_msg)
+
+    # Vertex AI는 일일 한도 없음 → 항상 분당 RPM 제한
+    if _USE_VERTEX:
+        is_daily = False
+    else:
+        # Developer API: 일일 한도 소진 감지
+        is_daily = "PerDay" in err and "limit: 0" in err
+
+    # 권장 대기시간 파싱
+    m = re.search(r'retry in ([\d.]+)s', err, re.IGNORECASE)
+    retry_sec = float(m.group(1)) + 2 if m else 50  # 여유 2초
+
+    return is_daily, retry_sec
+
+
+def step3_gemini(video_path, obj_img_path, kw, user_prompt=""):
+    """
+    Gemini API 호출 → changed_first_frame.png 저장 → (f1, f2) 반환.
+    항상 새로 생성 (캐시 사용 안 함).
     """
     cap = cv2.VideoCapture(video_path)
     ret, f1 = cap.read()
@@ -367,91 +473,54 @@ def step3_gemini(video_path, obj_img_path, kw):
 
     changed_path = os.path.join(INPUTS, "changed_first_frame.png")
 
-    # 기존 changed_first_frame 재사용
-    if os.path.isfile(changed_path):
-        f2 = cv2.imread(changed_path)
-        if f2 is not None and f2.mean() > 10:
-            log.info("기존 changed_first_frame 재사용")
-            return f1, f2
-        elif f2 is not None:
-            os.remove(changed_path)
+    if gemini_client is None:
+        raise RuntimeError(
+            ".env에 GOOGLE_CLOUD_PROJECT (Vertex AI) 또는 GEMINI_API_KEY를 설정하세요."
+        )
 
-    if not GMS_API_KEY:
-        raise RuntimeError("GMS_API_KEY 미설정")
+    # ── Gemini 프롬프트 (사용자 원문 직접 전달) ──
+    gemini_prompt = _build_gemini_prompt(kw, w1, h1, user_prompt)
 
-    # ── Gemini 프롬프트 ──
-    gemini_prompt = (
-        f"I am giving you two images. "
-        f"Image 1 is a {w1}x{h1} LANDSCAPE photo (wider than tall). "
-        f"Image 2 is the object to add (a {kw}). "
-        f"YOUR TASK: Output a new LANDSCAPE image that is identical to Image 1, "
-        f"but with the {kw} from Image 2 placed on the empty area of the table/desk. "
-        f"CRITICAL: The output MUST be LANDSCAPE orientation (wider than tall), "
-        f"exactly matching Image 1\'s layout. "
-        f"DO NOT rotate, crop, or change the orientation to portrait. "
-        f"DO NOT change any existing objects, people, or background elements. "
-        f"Only ADD the {kw} with a realistic shadow."
-    )
+    first_pil = _cv2_to_pil(f1, max_side=1280)
+    obj_pil = _load_obj_as_pil(obj_img_path, max_side=512)
+    log.info(f"API 페이로드: 배경 {first_pil.size}, 객체 {obj_pil.size}")
 
-    first_b64 = _cv2_to_base64_jpeg(f1, quality=90, max_side=1280)
-    obj_b64 = _file_to_base64_jpeg(obj_img_path, quality=90, max_side=512)
-    log.info(f"API 페이로드: 배경 {len(first_b64)//1024}KB, 객체 {len(obj_b64)//1024}KB")
-
-    payload = {
-        "contents": [{"parts": [
-            {"text": gemini_prompt},
-            {"inline_data": {"mime_type": "image/jpeg", "data": first_b64}},
-            {"inline_data": {"mime_type": "image/jpeg", "data": obj_b64}}
-        ]}],
-        "generationConfig": {
-            "responseModalities": ["TEXT", "IMAGE"],
-            "imageConfig": {"aspectRatio": "16:9"}
-        }
-    }
-    headers = {"x-goog-api-key": GMS_API_KEY, "Content-Type": "application/json"}
-
-    # create_gemini.png 캐시 (이전 버전 호환)
-    gemini_cache = os.path.join(INPUTS, "create_gemini.png")
     f2 = None
-    if os.path.isfile(gemini_cache):
-        f2 = cv2.imread(gemini_cache)
-        if f2 is not None:
-            log.info(f"기존 create_gemini.png → changed_first_frame으로 재사용")
-
-    if f2 is None:
-        resp = None
-        for attempt in range(3):
-            log.info(f"Gemini API (시도 {attempt+1}/3)...")
-            try:
-                resp = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=180)
-                resp.raise_for_status()
+    for attempt in range(5):
+        log.info(f"Gemini API (시도 {attempt+1}/5)...")
+        try:
+            response = gemini_client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=[gemini_prompt, first_pil, obj_pil],
+                config=types.GenerateContentConfig(
+                    response_modalities=["TEXT", "IMAGE"],
+                ),
+            )
+            result_pil = _extract_image_from_response(response)
+            if result_pil is not None:
+                f2 = _pil_to_cv2(result_pil)
                 log.info("API 성공!")
                 break
-            except requests.exceptions.RequestException as e:
-                err = resp.text[:300] if resp is not None else "없음"
-                log.warning(f"시도 {attempt+1} 실패: {err}")
-                resp = None
-                if attempt < 2:
-                    import time; time.sleep(3)
-        if resp is None:
-            raise RuntimeError("Gemini API 3회 실패")
-
-        result = resp.json()
-        generated_image = None
-        for cand in result.get("candidates", []):
-            for part in cand.get("content", {}).get("parts", []):
-                for key in ["inlineData", "inline_data"]:
-                    if key in part and "data" in part[key]:
-                        generated_image = base64.standard_b64decode(part[key]["data"])
-                        break
-                if generated_image: break
-            if generated_image: break
-        if not generated_image:
             raise RuntimeError("Gemini 응답에 이미지 없음")
-
-        f2 = cv2.imdecode(np.frombuffer(generated_image, np.uint8), cv2.IMREAD_COLOR)
-        if f2 is None:
-            raise RuntimeError("이미지 디코딩 실패")
+        except Exception as e:
+            err_str = str(e)
+            log.warning(f"시도 {attempt+1} 실패: {err_str[:200]}")
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                is_daily, wait = _parse_rate_limit_error(err_str)
+                if is_daily:
+                    raise RuntimeError(
+                        "❌ Gemini API 일일 무료 할당량이 소진되었습니다.\n"
+                        "  해결 방법:\n"
+                        "  1) 내일 다시 시도\n"
+                        "  2) 다른 API Key 사용\n"
+                        "  3) Google AI Studio에서 유료 플랜 활성화"
+                    )
+                log.info(f"분당 Rate limit — {wait:.0f}초 대기 후 재시도...")
+                import time; time.sleep(wait)
+            elif attempt < 4:
+                import time; time.sleep(5)
+    if f2 is None:
+        raise RuntimeError("Gemini API 5회 실패")
 
     cv2.imwrite(changed_path, f2)
     log.info(f"changed_first_frame 저장: {f2.shape[1]}x{f2.shape[0]}")
@@ -756,23 +825,101 @@ def extract_shadow_map(f1, f2, mask):
              f"검증된 그림자: {np.sum(valid_shadow > 0)}px)")
     return shadow_map
 
+def _diff_bbox(first_frame, generated_frame):
+    """
+    first_frame과 generated_frame의 픽셀 차이로 추가된 객체의 bbox를 추출한다.
+    마스크가 아닌 bbox만 반환 (정밀 마스크는 SAM에 위임).
+    
+    반환: (x, y, w, h) 또는 None
+    """
+    h1, w1 = first_frame.shape[:2]
+    h2, w2 = generated_frame.shape[:2]
+    if (h1, w1) != (h2, w2):
+        first_resized = cv2.resize(first_frame, (w2, h2), interpolation=cv2.INTER_AREA)
+    else:
+        first_resized = first_frame
+
+    # Lab 색 공간 차이
+    lab1 = cv2.cvtColor(first_resized, cv2.COLOR_BGR2Lab).astype(np.float32)
+    lab2 = cv2.cvtColor(generated_frame, cv2.COLOR_BGR2Lab).astype(np.float32)
+    diff = np.sqrt(np.sum((lab1 - lab2) ** 2, axis=2))
+
+    # 높은 임계값 → 확실한 변화만 포착 (배경 노이즈 배제)
+    p99 = np.percentile(diff, 99)
+    p50 = np.percentile(diff, 50)
+    threshold = max(p50 + (p99 - p50) * 0.4, 20.0)
+
+    binary = (diff > threshold).astype(np.uint8) * 255
+
+    # 강한 노이즈 제거
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
+    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=2)
+    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel, iterations=2)
+
+    # 최대 연결 컴포넌트
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary, 8)
+    if num_labels <= 1:
+        return None
+
+    areas = stats[1:, cv2.CC_STAT_AREA]
+    largest_label = np.argmax(areas) + 1
+    obj_area = stats[largest_label, cv2.CC_STAT_AREA]
+
+    total_pixels = h2 * w2
+    if obj_area < total_pixels * 0.005:
+        log.info(f"Diff: 변화 영역 너무 작음 ({obj_area}px)")
+        return None
+
+    # bbox + 여유 패딩
+    bx = stats[largest_label, cv2.CC_STAT_LEFT]
+    by = stats[largest_label, cv2.CC_STAT_TOP]
+    bw = stats[largest_label, cv2.CC_STAT_WIDTH]
+    bh = stats[largest_label, cv2.CC_STAT_HEIGHT]
+
+    pad = int(max(bw, bh) * 0.1)
+    bx = max(0, bx - pad)
+    by = max(0, by - pad)
+    bw = min(bw + 2 * pad, w2 - bx)
+    bh = min(bh + 2 * pad, h2 - by)
+
+    log.info(f"Diff bbox ✅: 영역={obj_area}px ({obj_area/total_pixels*100:.1f}%), "
+             f"bbox=({bx},{by},{bw},{bh}), threshold={threshold:.1f}")
+    return (bx, by, bw, bh)
+
+
 def step4_extract(first_frame, generated_frame, keyword):
-    """DINO → SAM → 정제. 다중 객체 지원. 폴백 없음."""
-    all_bboxes = _dino_detect(generated_frame, keyword)
-
-    # 각 bbox에 대해 SAM 세그멘테이션 실행 후 마스크 결합
+    """
+    추가된 객체 추출. 하이브리드 전략:
+      1) Diff로 대략적 bbox 찾기 (기둥 등 DINO가 놓치는 부분 포함)
+      2) SAM으로 정밀 마스크 추출 (건물 노이즈 제거)
+      폴백: Diff 실패 시 DINO bbox → SAM
+    """
     fh, fw = generated_frame.shape[:2]
-    combined_mask = np.zeros((fh, fw), dtype=np.uint8)
 
-    for i, bbox in enumerate(all_bboxes):
-        log.info(f"SAM 세그멘테이션 [{i+1}/{len(all_bboxes)}]: bbox={bbox}")
-        mask_i = _sam_segment(generated_frame, bbox)
-        mask_i = _refine_mask(mask_i, generated_frame, bbox)
-        combined_mask = cv2.bitwise_or(combined_mask, mask_i)
+    # ── Diff로 bbox 탐색 ──
+    log.info("객체 추출: Diff로 변경 영역 탐색...")
+    diff_bbox = _diff_bbox(first_frame, generated_frame)
 
-    log.info(f"마스크 결합 완료: {len(all_bboxes)}개 객체")
+    if diff_bbox is not None:
+        # ── Diff bbox → SAM 정밀 세그멘테이션 ──
+        log.info(f"Diff bbox 발견 → SAM으로 정밀 마스크 추출...")
+        combined_mask = _sam_segment(generated_frame, diff_bbox)
+        combined_mask = _refine_mask(combined_mask, generated_frame, diff_bbox)
+        log.info("Diff + SAM 하이브리드 추출 완료")
+    else:
+        # ── 폴백: DINO + SAM ──
+        log.info("Diff 탐색 불충분 — DINO + SAM 폴백...")
+        all_bboxes = _dino_detect(generated_frame, keyword)
 
-    # 그림자 추출 (결합된 마스크 기준, 마스크를 약간 축소하여 경계 아티팩트 방지)
+        combined_mask = np.zeros((fh, fw), dtype=np.uint8)
+        for i, bb in enumerate(all_bboxes):
+            log.info(f"SAM 세그멘테이션 [{i+1}/{len(all_bboxes)}]: bbox={bb}")
+            mask_i = _sam_segment(generated_frame, bb)
+            mask_i = _refine_mask(mask_i, generated_frame, bb)
+            combined_mask = cv2.bitwise_or(combined_mask, mask_i)
+        log.info(f"마스크 결합 완료: {len(all_bboxes)}개 객체")
+
+    # 그림자 추출
     eroded_mask = cv2.erode(combined_mask, np.ones((5, 5), np.uint8), iterations=1)
     shadow_map = extract_shadow_map(first_frame, generated_frame, eroded_mask)
 
@@ -781,13 +928,13 @@ def step4_extract(first_frame, generated_frame, keyword):
     merged = cv2.bitwise_or(combined_mask, shadow_binary)
 
     coords = cv2.findNonZero(merged)
+    bbox = (0, 0, fw, fh)
     if coords is not None:
         mx, my, mw, mh = cv2.boundingRect(coords)
-        gh, gw = combined_mask.shape[:2]
         p = 20
         bbox = (max(0, mx - p), max(0, my - p),
-                min(mw + 2 * p, gw - max(0, mx - p)),
-                min(mh + 2 * p, gh - max(0, my - p)))
+                min(mw + 2 * p, fw - max(0, mx - p)),
+                min(mh + 2 * p, fh - max(0, my - p)))
 
     log.info(f"최종 bbox(그림자 포함): {bbox}")
     cv2.imwrite(os.path.join(OUTPUTS, "object_mask.png"), combined_mask)
@@ -824,9 +971,6 @@ def step5_scale(f2, mask, shadow_map, bbox, vw, vh):
     return obj, mr, sr, (vx, vy, vw_b, vh_b)
 
 
-# ══════════════════════════════════════════════════════════════
-# STEP 5.5 — Contact Shadow (마스크 하단 기반)
-# ══════════════════════════════════════════════════════════════
 def step6_composite(vpath, obj, mr, sr, vbbox, opath):
     cap = cv2.VideoCapture(vpath)
     vw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -882,8 +1026,22 @@ def step6_composite(vpath, obj, mr, sr, vbbox, opath):
     base_depth = np.median(bg_depth[bottom_y_start:y2, x1:x2])
     log.info(f"합성 객체의 추정 Z-Depth 베이스 값: {base_depth:.1f} (0~255)")
 
-
     n = 0
+    prev_occ = np.zeros((y2 - y1, x2 - x1), dtype=np.float32)  # 시간축 스무딩용
+
+    # 첫 프레임 ROI 저장 (움직임 감지 기준)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+    ret, ref_frame = cap.read()
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+    ref_roi_gray = cv2.cvtColor(ref_frame[y1:y2, x1:x2], cv2.COLOR_BGR2GRAY).astype(np.float32)
+
+    # 움직임 감지 임계값: ROI 내 평균 픽셀 변화가 이 값 이상이면 "무언가 지나감"
+    MOTION_THRESHOLD = 15.0
+    # 깊이 허용 오차: 노이즈 대비 넉넉하게 설정
+    DEPTH_TOLERANCE = 20
+    # 시간축 스무딩 계수: 0에 가까울수록 이전 프레임 영향 큼 (깜빡임 방지)
+    TEMPORAL_ALPHA = 0.3
+
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -892,41 +1050,49 @@ def step6_composite(vpath, obj, mr, sr, vbbox, opath):
         roi = frame[y1:y2, x1:x2].astype(np.float32)
 
         # ------------------------------------------------------------
-        # Z-Depth 기반 동적 마스킹 (손, 사람 등 모든 프론트 객체) 판별
+        # 움직임 감지 → 실제로 ROI에 변화가 있을 때만 Z-Depth 가림 적용
         # ------------------------------------------------------------
-        # 현재 프레임의 깊이 맵 추출
-        frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        curr_depth_out = depth_estimator(frame_pil)
-        curr_depth = np.array(curr_depth_out["depth"].resize((vw, vh), Image.Resampling.BILINEAR))
-        
-        # 합성이 일어날 ROI 구역의 깊이 타일
-        roi_depth = curr_depth[y1:y2, x1:x2]
+        curr_roi_gray = cv2.cvtColor(frame[y1:y2, x1:x2], cv2.COLOR_BGR2GRAY).astype(np.float32)
+        motion_diff = np.abs(curr_roi_gray - ref_roi_gray).mean()
 
-        # 객체보다 카메라에 더 가까운(깊이 값이 더 큰) 픽셀은 가림막(Occlusion) 처리
-        # 오차(Tolerance)를 두어 자연스러운 윤곽선 보장 (+ 5)
-        # 0~255 스케일에서 5 정도의 차이는 꽤 분명한 전경/배경 차이 단서임
-        Depth_Tolerance = 5
-        occlusion_mask = (roi_depth > (base_depth + Depth_Tolerance)).astype(np.float32)
+        if motion_diff > MOTION_THRESHOLD:
+            # 실제 움직임 감지 → 깊이 기반 가림 판정
+            frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            curr_depth_out = depth_estimator(frame_pil)
+            curr_depth = np.array(curr_depth_out["depth"].resize((vw, vh), Image.Resampling.BILINEAR))
+            roi_depth = curr_depth[y1:y2, x1:x2]
 
-        # 가림막 마스크 경계선을 부드럽게 (알파 블렌딩용 가우시안)
-        occ_float = cv2.GaussianBlur(occlusion_mask.astype(np.float32), (15, 15), 0)
-        occ_3 = np.stack([occ_float]*3, axis=-1)
+            raw_occ = (roi_depth > (base_depth + DEPTH_TOLERANCE)).astype(np.float32)
+            # 작은 노이즈 영역 제거 (열림 연산)
+            kernel = np.ones((5, 5), np.uint8)
+            raw_occ_u8 = (raw_occ * 255).astype(np.uint8)
+            raw_occ_u8 = cv2.morphologyEx(raw_occ_u8, cv2.MORPH_OPEN, kernel)
+            raw_occ = raw_occ_u8.astype(np.float32) / 255.0
+        else:
+            # 움직임 없음 → 가림 없음
+            raw_occ = np.zeros((y2 - y1, x2 - x1), dtype=np.float32)
+
+        # 시간축 스무딩: 급격한 변화 방지
+        smoothed_occ = TEMPORAL_ALPHA * raw_occ + (1.0 - TEMPORAL_ALPHA) * prev_occ
+        prev_occ = smoothed_occ
+
+        # 매우 약한 가림은 무시 (임계값 이하 제거)
+        smoothed_occ[smoothed_occ < 0.3] = 0.0
+
+        # 가림막 마스크 경계선을 부드럽게
+        occ_float = cv2.GaussianBlur(smoothed_occ, (15, 15), 0)
+        occ_3 = np.stack([occ_float] * 3, axis=-1)
 
         # ------------------------------------------------------------
         # 합성 계산
         # ------------------------------------------------------------
-        # 원본 알파값(a3)에서 앞을 가리는 부분(occ_3)은 알파값을 깎아냄 (투명화)
         occluded_a3 = a3 * (1.0 - occ_3)
-
-        # 그림자(s3) 역시 물체 앞을 지나는 것 위에는 생기면 안됨.
-        # s3는 값이 0일수록 어두움(그림자), 1.0에 가까울수록 원본(밝음).
-        # occ_3 가 1.0(가림)인 곳은 그림자 효과를 없애서 1.0으로 만듦
         occluded_s3 = 1.0 - ((1.0 - s3) * (1.0 - occ_3))
 
         # (1) AI 그림자를 배경에 적용
         roi = roi * occluded_s3
 
-        # (2) 객체 알파 블렌딩을 그 위에 적용
+        # (2) 객체 알파 블렌딩
         roi = fg * occluded_a3 + roi * (1.0 - occluded_a3)
 
         frame[y1:y2, x1:x2] = np.clip(roi, 0, 255).astype(np.uint8)
@@ -954,7 +1120,7 @@ def main():
     log.info("─" * 45)
     log.info("STEP 3 — Gemini API (changed_first_frame 생성)")
     try:
-        f1, f2 = step3_gemini(vpath, obj_img_path, kw)
+        f1, f2 = step3_gemini(vpath, obj_img_path, kw, user_prompt)
     except RuntimeError as e:
         print(f"❌ {e}")
         return
@@ -983,67 +1149,42 @@ def main():
     print("=" * 55)
 
 
-def _call_gemini_once(first_b64, obj_b64, kw, w1, h1):
+def _call_gemini_once(first_pil, obj_pil, kw, w1, h1, user_prompt=""):
     """Gemini API를 1회 호출하여 합성 이미지(cv2 ndarray)를 반환한다."""
-    gemini_prompt = (
-        f"I am giving you two images. "
-        f"Image 1 is a {w1}x{h1} LANDSCAPE photo (wider than tall). "
-        f"Image 2 is the object to add (a {kw}). "
-        f"YOUR TASK: Output a new LANDSCAPE image that is identical to Image 1, "
-        f"but with the {kw} from Image 2 placed on the empty area of the table/desk. "
-        f"CRITICAL: The output MUST be LANDSCAPE orientation (wider than tall), "
-        f"exactly matching Image 1's layout. "
-        f"DO NOT rotate, crop, or change the orientation to portrait. "
-        f"DO NOT change any existing objects, people, or background elements. "
-        f"Only ADD the {kw} with a realistic shadow."
-    )
+    gemini_prompt = _build_gemini_prompt(kw, w1, h1, user_prompt)
 
-    payload = {
-        "contents": [{"parts": [
-            {"text": gemini_prompt},
-            {"inline_data": {"mime_type": "image/jpeg", "data": first_b64}},
-            {"inline_data": {"mime_type": "image/jpeg", "data": obj_b64}}
-        ]}],
-        "generationConfig": {
-            "responseModalities": ["TEXT", "IMAGE"],
-            "imageConfig": {"aspectRatio": "16:9"}
-        }
-    }
-    headers = {"x-goog-api-key": GMS_API_KEY, "Content-Type": "application/json"}
-
-    resp = None
-    for attempt in range(3):
-        log.info(f"Gemini API (시도 {attempt+1}/3)...")
+    for attempt in range(5):
+        log.info(f"Gemini API (시도 {attempt+1}/5)...")
         try:
-            resp = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=180)
-            resp.raise_for_status()
-            break
-        except requests.exceptions.RequestException as e:
-            err = resp.text[:300] if resp is not None else "없음"
-            log.warning(f"시도 {attempt+1} 실패: {err}")
-            resp = None
-            if attempt < 2:
-                import time; time.sleep(3)
-    if resp is None:
-        raise RuntimeError("Gemini API 3회 실패")
-
-    result = resp.json()
-    generated_image = None
-    for cand in result.get("candidates", []):
-        for part in cand.get("content", {}).get("parts", []):
-            for key in ["inlineData", "inline_data"]:
-                if key in part and "data" in part[key]:
-                    generated_image = base64.standard_b64decode(part[key]["data"])
-                    break
-            if generated_image: break
-        if generated_image: break
-    if not generated_image:
-        raise RuntimeError("Gemini 응답에 이미지 없음")
-
-    img = cv2.imdecode(np.frombuffer(generated_image, np.uint8), cv2.IMREAD_COLOR)
-    if img is None:
-        raise RuntimeError("이미지 디코딩 실패")
-    return img
+            response = gemini_client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=[gemini_prompt, first_pil, obj_pil],
+                config=types.GenerateContentConfig(
+                    response_modalities=["TEXT", "IMAGE"],
+                ),
+            )
+            result_pil = _extract_image_from_response(response)
+            if result_pil is not None:
+                return _pil_to_cv2(result_pil)
+            raise RuntimeError("Gemini 응답에 이미지 없음")
+        except Exception as e:
+            err_str = str(e)
+            log.warning(f"시도 {attempt+1} 실패: {err_str[:200]}")
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                is_daily, wait = _parse_rate_limit_error(err_str)
+                if is_daily:
+                    raise RuntimeError(
+                        "❌ Gemini API 일일 무료 할당량이 소진되었습니다.\n"
+                        "  해결 방법:\n"
+                        "  1) 내일 다시 시도\n"
+                        "  2) 다른 API Key 사용\n"
+                        "  3) Google AI Studio에서 유료 플랜 활성화"
+                    )
+                log.info(f"분당 Rate limit — {wait:.0f}초 대기 후 재시도...")
+                import time; time.sleep(wait)
+            elif attempt < 4:
+                import time; time.sleep(5)
+    raise RuntimeError("Gemini API 5회 실패")
 
 
 def generate_previews(video_path, obj_img_path, user_prompt, count=3, on_progress=None):
@@ -1064,8 +1205,8 @@ def generate_previews(video_path, obj_img_path, user_prompt, count=3, on_progres
         if on_progress:
             on_progress(stage, percent, message)
 
-    if not GMS_API_KEY:
-        raise RuntimeError("GMS_API_KEY 미설정")
+    if gemini_client is None:
+        raise RuntimeError("Gemini API 미설정")
 
     # 키워드 추출
     _, _, kw = step2_auto_detect(user_prompt)
@@ -1078,15 +1219,15 @@ def generate_previews(video_path, obj_img_path, user_prompt, count=3, on_progres
         raise IOError("첫 프레임 읽기 실패")
 
     h1, w1 = f1.shape[:2]
-    first_b64 = _cv2_to_base64_jpeg(f1, quality=90, max_side=1280)
-    obj_b64 = _file_to_base64_jpeg(obj_img_path, quality=90, max_side=512)
+    first_pil = _cv2_to_pil(f1, max_side=1280)
+    obj_pil = _load_obj_as_pil(obj_img_path, max_side=512)
 
     preview_paths = []
     for i in range(count):
         pct = int(10 + (80 * i / count))
         _p("GEMINI", pct, f"Gemini 모델이 프리뷰 이미지를 생성하는 중입니다... ({i+1}/{count})")
 
-        img = _call_gemini_once(first_b64, obj_b64, kw, w1, h1)
+        img = _call_gemini_once(first_pil, obj_pil, kw, w1, h1, user_prompt)
         path = os.path.join(OUTPUTS, f"preview_{i}.png")
         cv2.imwrite(path, img)
         preview_paths.append(path)
