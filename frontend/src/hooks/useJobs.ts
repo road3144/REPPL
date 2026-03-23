@@ -77,7 +77,7 @@ export function useJobs() {
     return () => { active = false; };
   }, []);
 
-  // 활성 Job에 대해 WebSocket 구독
+  // 활성 Job에 대해 WebSocket 구독 (구독/해제만, cleanup은 언마운트 시만)
   useEffect(() => {
     const activeJobIds = jobs
       .filter((job) => job.status === 'QUEUED' || job.status === 'RUNNING')
@@ -98,15 +98,18 @@ export function useJobs() {
         wsUnsubs.current.delete(jobId);
       }
     }
+    // cleanup은 아래 별도 effect에서 언마운트 시만 실행
+  });
 
+  // 컴포넌트 언마운트 시 전체 구독 해제
+  useEffect(() => {
     return () => {
-      // 컴포넌트 언마운트 시 전체 해제
       for (const unsub of wsUnsubs.current.values()) {
         unsub();
       }
       wsUnsubs.current.clear();
     };
-  }, [jobs, handleWsMessage]);
+  }, []);
 
   // WS 연결 실패 시 폴링 폴백
   useEffect(() => {
