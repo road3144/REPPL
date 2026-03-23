@@ -1,5 +1,6 @@
 package com.a401.reppl.config;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -26,7 +27,12 @@ public class RedisConfig {
     }
 
     @Bean
-    public Jackson2HashMapper hashMapper(ObjectMapper objectMapper) {
-        return new Jackson2HashMapper(objectMapper, true);  // flatten = true
+    public Jackson2HashMapper hashMapper() {
+        // Redis 전용 ObjectMapper (null 필드 제외 → NullNode 에러 방지)
+        ObjectMapper redisMapper = new ObjectMapper();
+        redisMapper.registerModule(new JavaTimeModule());
+        redisMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        redisMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        return new Jackson2HashMapper(redisMapper, true);
     }
 }
