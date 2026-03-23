@@ -13,7 +13,7 @@ export type TrackedJob = JobItem & {
   jobType: JobType;
 };
 
-export function useDemoJobs() {
+export function useJobs() {
   const [jobs, setJobs] = useState<TrackedJob[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

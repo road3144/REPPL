@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { JobCreateForm } from '../components/studio/JobCreateForm';
-import { useDemoJobs } from '../hooks/useDemoJobs';
-import { createPreviewJob, getCandidateFrames, getJobStatus } from '../services/api';
+import { PreviewSelectModal } from '../components/studio/PreviewSelectModal';
+import { useJobs } from '../hooks/useJobs';
 import { formatStage } from '../constants/stage';
-import type { CandidateFrame, JobItem } from '../services/types';
+import type { JobItem } from '../services/types';
 
 /* ── Status config ── */
 const STATUS_CFG: Record<string, { label: string; badgeCls: string; progressCls: string }> = {
@@ -16,23 +16,14 @@ const STATUS_CFG: Record<string, { label: string; badgeCls: string; progressCls:
 
 type Tab = 'all' | 'running' | 'waiting' | 'done';
 
-type UploadedInfo = {
-  videoKey: string;
-  imageKey: string;
-  prompt: string;
-};
-
 export function WorkspacePage() {
-  const { jobs, loadingJobs, errorMessage, setErrorMessage, prependCreatedJob, downloadResult } = useDemoJobs();
+  const {
+    jobs, loadingJobs, errorMessage, setErrorMessage,
+    prependCreatedJob, downloadResult,
+    previewSelecting, selectingIndex, loadPreviews, handleSelectPreview, closePreviewSelection,
+  } = useJobs();
 
   const [tab, setTab] = useState<Tab>('all');
-
-  /* ── Candidate drawer state ── */
-  const [uploadedInfo, setUploadedInfo] = useState<UploadedInfo | null>(null);
-  const [candidates, setCandidates] = useState<CandidateFrame[]>([]);
-  const [loadingCandidates, setLoadingCandidates] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState<string | null>(null);
-  const [confirmingJob, setConfirmingJob] = useState(false);
 
   /* ── Completion toast ── */
   const [toast, setToast] = useState<{ jobId: string } | null>(null);
@@ -52,55 +43,6 @@ export function WorkspacePage() {
     }
     prevJobsRef.current = jobs;
   }, [jobs]);
-
-  /* After upload → fetch mock candidate frames → open drawer */
-  const handleUploaded = async (videoKey: string, imageKey: string, prompt: string) => {
-    setUploadedInfo({ videoKey, imageKey, prompt });
-    setLoadingCandidates(true);
-    setCandidates([]);
-    setSelectedCandidate(null);
-    try {
-      const frames = await getCandidateFrames(videoKey);
-      setCandidates(frames);
-      if (frames[0]) setSelectedCandidate(frames[0].id);
-    } catch {
-      setErrorMessage('후보 장면 조회에 실패했습니다.');
-      setUploadedInfo(null);
-    } finally {
-      setLoadingCandidates(false);
-    }
-  };
-
-  /* Candidate confirmed → createJob → add to list */
-  const handleConfirm = async () => {
-    if (!uploadedInfo || !selectedCandidate) return;
-    setConfirmingJob(true);
-    try {
-      const created = await createPreviewJob({
-        videoKey: uploadedInfo.videoKey,
-        refImageKeys: [uploadedInfo.imageKey],
-        options: { placementPrompt: uploadedInfo.prompt },
-      });
-      const status = await getJobStatus(created.jobId);
-      prependCreatedJob(status);
-      setUploadedInfo(null);
-      setCandidates([]);
-      setSelectedCandidate(null);
-    } catch (e: unknown) {
-      setErrorMessage(e instanceof Error ? e.message : '작업 생성에 실패했습니다.');
-    } finally {
-      setConfirmingJob(false);
-    }
-  };
-
-  const closeDrawer = () => {
-    if (confirmingJob) return;
-    setUploadedInfo(null);
-    setCandidates([]);
-    setSelectedCandidate(null);
-  };
-
-  const drawerOpen = uploadedInfo !== null;
 
   const filteredJobs = useMemo(() => {
     if (tab === 'running') return jobs.filter(j => j.status === 'RUNNING');
@@ -145,7 +87,7 @@ export function WorkspacePage() {
       {/* ── APP BODY ── */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-        {/* LEFT PANEL — 새 작업 만들기 (fixed) */}
+        {/* LEFT PANEL — 새 작업 만들기 */}
         <div style={{
           width: 400, flexShrink: 0, background: '#fff', borderRight: '1px solid #e5e7ef',
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
@@ -159,7 +101,6 @@ export function WorkspacePage() {
             <JobCreateForm
               onCreated={prependCreatedJob}
               onError={setErrorMessage}
-              onUploaded={handleUploaded}
               className="p-5"
             />
           </div>
@@ -178,7 +119,7 @@ export function WorkspacePage() {
           )}
         </div>
 
-        {/* RIGHT PANEL — 나의 작업들 (scrollable) */}
+        {/* RIGHT PANEL — 나의 작업들 */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
           {/* Header + filter tabs */}
@@ -226,122 +167,29 @@ export function WorkspacePage() {
               </div>
             )}
             {filteredJobs.map(job => (
-              <JobCard key={job.jobId} job={job} onDownload={downloadResult} />
+              <JobCard
+                key={job.jobId}
+                job={job}
+                onDownload={downloadResult}
+                onSelectPreview={loadPreviews}
+              />
             ))}
           </div>
         </div>
       </div>
 
-      {/* ── CANDIDATE DRAWER (right slide-in) ── */}
-      {drawerOpen && (
-        <>
-          {/* Overlay */}
-          <div
-            onClick={closeDrawer}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 100 }}
-          />
-
-          {/* Drawer panel */}
-          <div style={{
-            position: 'fixed', top: 0, right: 0, bottom: 0, width: 480,
-            background: '#fff', zIndex: 101,
-            display: 'flex', flexDirection: 'column',
-            boxShadow: '-8px 0 40px rgba(0,0,0,0.15)',
-            animation: 'slideInDrawer 0.25s ease',
-          }}>
-            {/* Drawer header */}
-            <div style={{
-              padding: '20px 24px', borderBottom: '1px solid #f0f0f5',
-              display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0,
-            }}>
-              <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#111', margin: 0 }}>삽입 위치 선택</h3>
-                <p style={{ fontSize: 12, color: '#999', marginTop: 4 }}>AI가 추천하는 장면 중 하나를 선택하세요</p>
-              </div>
-              {!confirmingJob && (
-                <button
-                  onClick={closeDrawer}
-                  style={{
-                    background: '#f5f5f8', border: 'none', borderRadius: 8,
-                    width: 32, height: 32, cursor: 'pointer', fontSize: 18, color: '#666',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >×</button>
-              )}
-            </div>
-
-            {/* Candidate list */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {loadingCandidates ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '64px 0' }}>
-                  <div className="loading-spinner" />
-                  <p style={{ fontSize: 13, color: '#999' }}>영상 분석 중…</p>
-                </div>
-              ) : (
-                candidates.map(frame => (
-                  <div
-                    key={frame.id}
-                    onClick={() => setSelectedCandidate(frame.id)}
-                    style={{
-                      border: `2px solid ${selectedCandidate === frame.id ? '#4a6cf7' : '#e8ebf5'}`,
-                      borderRadius: 12, overflow: 'hidden', cursor: 'pointer',
-                      boxShadow: selectedCandidate === frame.id ? '0 0 0 3px rgba(74,108,247,0.12)' : 'none',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {/* Thumbnail */}
-                    <div style={{
-                      width: '100%', height: 160,
-                      background: frame.color,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      position: 'relative',
-                    }}>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', letterSpacing: 1, textTransform: 'uppercase' }}>
-                        scene {frame.id}
-                      </span>
-                      <span style={{
-                        position: 'absolute', top: 10, right: 10,
-                        padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-                        background: selectedCandidate === frame.id ? '#4a6cf7' : 'rgba(0,0,0,0.45)',
-                        color: '#fff',
-                      }}>
-                        {selectedCandidate === frame.id ? '선택됨' : '추천'}
-                      </span>
-                    </div>
-                    {/* Meta */}
-                    <div style={{ padding: '12px 14px', background: '#fff' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{frame.timestampLabel}</div>
-                      <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>
-                        {frame.description} · 신뢰도 {frame.confidence}%
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Confirm button */}
-            <div style={{ padding: '16px 24px', borderTop: '1px solid #f0f0f5', flexShrink: 0 }}>
-              <button
-                onClick={handleConfirm}
-                disabled={!selectedCandidate || confirmingJob || loadingCandidates}
-                style={{
-                  width: '100%', padding: 13,
-                  background: (!selectedCandidate || confirmingJob || loadingCandidates) ? '#e2e8f0' : '#4a6cf7',
-                  color: (!selectedCandidate || confirmingJob || loadingCandidates) ? '#94a3b8' : '#fff',
-                  border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700,
-                  cursor: (!selectedCandidate || confirmingJob || loadingCandidates) ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {confirmingJob ? '작업 생성 중…' : '이 장면으로 합성 시작 →'}
-              </button>
-            </div>
-          </div>
-        </>
+      {/* ── PREVIEW SELECT MODAL ── */}
+      {previewSelecting && (
+        <PreviewSelectModal
+          jobId={previewSelecting.jobId}
+          previews={previewSelecting.previews}
+          selecting={selectingIndex}
+          onSelect={(index) => handleSelectPreview(previewSelecting.jobId, index)}
+          onClose={closePreviewSelection}
+        />
       )}
 
-      {/* ── COMPLETION TOAST (bottom-right, kakao style) ── */}
+      {/* ── COMPLETION TOAST ── */}
       {toast && (
         <div style={{
           position: 'fixed', bottom: 28, right: 28, zIndex: 200,
@@ -351,7 +199,6 @@ export function WorkspacePage() {
           minWidth: 300, maxWidth: 340, overflow: 'hidden',
           animation: 'slideUpToast 0.3s ease',
         }}>
-          {/* Progress bar (auto-dismiss indicator) */}
           <div style={{
             position: 'absolute', bottom: 0, left: 0, height: 3,
             background: '#4a6cf7', borderRadius: '0 3px 3px 0',
@@ -382,9 +229,15 @@ export function WorkspacePage() {
 }
 
 /* ── Job Card component ── */
-function JobCard({ job, onDownload }: { job: JobItem; onDownload: (id: string) => Promise<void> }) {
+function JobCard({ job, onDownload, onSelectPreview }: {
+  job: JobItem;
+  onDownload: (id: string) => Promise<void>;
+  onSelectPreview: (id: string) => void;
+}) {
   const cfg = STATUS_CFG[job.status] ?? STATUS_CFG['QUEUED'];
   const progress = job.progress ?? (job.status === 'COMPLETED' ? 100 : 0);
+  const isPreviewCompleted = job.jobType === 'PREVIEW' && job.status === 'COMPLETED';
+  const isCompositeCompleted = job.jobType === 'COMPOSITE' && job.status === 'COMPLETED';
 
   return (
     <div className="job-card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -397,8 +250,19 @@ function JobCard({ job, onDownload }: { job: JobItem; onDownload: (id: string) =
 
       {/* Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {job.jobId}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {job.jobId}
+          </span>
+          {job.jobType && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4,
+              background: job.jobType === 'PREVIEW' ? '#ede9fe' : '#ecfdf5',
+              color: job.jobType === 'PREVIEW' ? '#7c3aed' : '#059669',
+            }}>
+              {job.jobType === 'PREVIEW' ? '프리뷰' : '합성'}
+            </span>
+          )}
         </div>
         {job.message && (
           <div style={{ fontSize: 12, color: '#aaa', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -428,7 +292,12 @@ function JobCard({ job, onDownload }: { job: JobItem; onDownload: (id: string) =
         {job.status === 'RUNNING' && (
           <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>{progress}%</span>
         )}
-        {job.status === 'COMPLETED' && (
+        {isPreviewCompleted && (
+          <button className="download-btn" onClick={() => onSelectPreview(job.jobId)}>
+            프리뷰 선택
+          </button>
+        )}
+        {isCompositeCompleted && (
           <button className="download-btn" onClick={() => onDownload(job.jobId)}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M12 5v14M5 12l7 7 7-7" />
