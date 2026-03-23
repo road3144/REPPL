@@ -147,6 +147,16 @@ export function LandingPage() {
         className="mt-[70px] relative flex items-center justify-center overflow-hidden"
         style={{ height: '90vh', background: 'linear-gradient(135deg, #0d0d0d 0%, #1a1a2e 50%, #0d0d0d 100%)' }}
       >
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 h-full w-full object-cover"
+        >
+          <source src="/videos/test_video.mp4" type="video/mp4" />
+        </video>
+
         {/* dark overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-black/60" />
 
