@@ -48,13 +48,10 @@ export function PreviewSelectModal({ jobId, previews, selecting, onSelect, onClo
                   : 'border-slate-200 hover:border-slate-300'
               } ${selecting ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
             >
-              <video
+              <img
                 src={preview.url}
+                alt={`프리뷰 ${preview.index + 1}`}
                 className="w-full aspect-video object-cover bg-slate-100"
-                muted
-                loop
-                autoPlay
-                playsInline
               />
               <div className="p-2 text-center">
                 <span className={`text-xs font-bold ${
