@@ -9,6 +9,21 @@ export function LandingPageSimple() {
         position: 'absolute', inset: 0,
         background: 'linear-gradient(160deg, #0a0a14 0%, #111128 40%, #0a0a14 100%)',
       }}>
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+          }}
+        >
+          <source src="/videos/test_video.mp4" type="video/mp4" />
+        </video>
         {/* scan-line texture */}
         <div style={{
           position: 'absolute', inset: 0, pointerEvents: 'none',
@@ -31,24 +46,11 @@ export function LandingPageSimple() {
       {/* Center overlay */}
       <div style={{
         position: 'absolute', inset: 0, zIndex: 5,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 32,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 14,
+        paddingBottom: 120,
       }}>
-        {/* Play button */}
-        <div style={{
-          width: 88, height: 88, borderRadius: '50%', cursor: 'pointer',
-          background: 'rgba(74,108,247,0.22)', border: '2px solid rgba(74,108,247,0.55)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backdropFilter: 'blur(4px)',
-        }}>
-          <div style={{
-            borderLeft: '30px solid rgba(255,255,255,0.92)',
-            borderTop: '18px solid transparent', borderBottom: '18px solid transparent',
-            marginLeft: 7,
-          }} />
-        </div>
-
-        <p style={{ fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>
-          ▶ &nbsp; Before / After 데모 영상
+        <p style={{ fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', color: 'rgba(255,255,255,0.38)', whiteSpace: 'nowrap' }}>
+          AI Virtual Product Placement
         </p>
 
         <Link
