@@ -24,8 +24,8 @@ public class UploadUrlController {
     private final S3Service s3Service;
     private final SessionRedisRepository sessionRedisRepository;
 
-    private static final long MAX_VIDEO_SIZE = 50L * 1024 * 1024; // 업로드 파일 크기 제한 50MB
-    private static final long MAX_IMAGE_SIZE = 10L * 1024 * 1024; // 업로드 파일 크기 제한 10MB
+    private static final long MAX_VIDEO_SIZE = 300L * 1024 * 1024; // 업로드 파일 크기 제한 50MB
+    private static final long MAX_IMAGE_SIZE = 30L * 1024 * 1024; // 업로드 파일 크기 제한 10MB
 
     /**
      * VIDEO 업로드 Presigned URL 발급 API
