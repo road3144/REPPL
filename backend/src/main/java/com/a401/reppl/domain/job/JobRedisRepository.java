@@ -1,8 +1,10 @@
 package com.a401.reppl.domain.job;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.hash.Jackson2HashMapper;
 import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
@@ -11,14 +13,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
 public class JobRedisRepository {
 
     private final StringRedisTemplate redisTemplate;
-    private final Jackson2HashMapper hashMapper;
+    private final ObjectMapper objectMapper;
 
     private static final Duration JOB_TTL = Duration.ofHours(24);
 
@@ -27,7 +28,7 @@ public class JobRedisRepository {
      */
     public void saveJobState(JobState state) {
         String key = JobKeys.jobState(state.getJobId());
-        Map<String, Object> hash = hashMapper.toHash(state);
+        Map<String, String> hash = toStringHash(state);
         redisTemplate.opsForHash().putAll(key, hash);
         redisTemplate.expire(key, JOB_TTL);
 
@@ -48,12 +49,7 @@ public class JobRedisRepository {
         if (entries.isEmpty()) {
             return Optional.empty();
         }
-        Map<String, Object> hash = entries.entrySet().stream()
-                .collect(Collectors.toMap(
-                        e -> e.getKey().toString(),
-                        Map.Entry::getValue
-                ));
-        return Optional.of((JobState) hashMapper.fromHash(hash));
+        return Optional.of(fromStringHash(entries));
     }
 
     /**
@@ -102,9 +98,8 @@ public class JobRedisRepository {
         updates.put("status", JobStatus.COMPLETED.name());
         updates.put("progress", "100");
         try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            updates.put("previewKeys", mapper.writeValueAsString(previewKeys));
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            updates.put("previewKeys", objectMapper.writeValueAsString(previewKeys));
+        } catch (JsonProcessingException e) {
             updates.put("previewKeys", "[]");
         }
         updates.put("updatedAt", Instant.now().toString());
@@ -143,4 +138,73 @@ public class JobRedisRepository {
         redisTemplate.opsForZSet().remove(JobKeys.CLEANUP_JOBS, jobId);
     }
 
+    // ── 수동 직렬화/역직렬화 ──
+
+    private Map<String, String> toStringHash(JobState state) {
+        Map<String, String> hash = new HashMap<>();
+        hash.put("jobId", state.getJobId());
+        hash.put("sessionId", state.getSessionId());
+        hash.put("status", state.getStatus().name());
+        hash.put("progress", String.valueOf(state.getProgress()));
+        if (state.getJobType() != null) hash.put("jobType", state.getJobType());
+        if (state.getStage() != null) hash.put("stage", state.getStage().name());
+        if (state.getMessage() != null) hash.put("message", state.getMessage());
+        if (state.getVideoKey() != null) hash.put("videoKey", state.getVideoKey());
+        if (state.getRefImageKeys() != null) {
+            try {
+                hash.put("refImageKeys", objectMapper.writeValueAsString(state.getRefImageKeys()));
+            } catch (JsonProcessingException ignored) {}
+        }
+        if (state.getPreviewKeys() != null) {
+            try {
+                hash.put("previewKeys", objectMapper.writeValueAsString(state.getPreviewKeys()));
+            } catch (JsonProcessingException ignored) {}
+        }
+        if (state.getResultKey() != null) hash.put("resultKey", state.getResultKey());
+        if (state.getRoiJson() != null) hash.put("roiJson", state.getRoiJson());
+        if (state.getOptionsJson() != null) hash.put("optionsJson", state.getOptionsJson());
+        if (state.getCreatedAt() != null) hash.put("createdAt", state.getCreatedAt().toString());
+        if (state.getUpdatedAt() != null) hash.put("updatedAt", state.getUpdatedAt().toString());
+        return hash;
+    }
+
+    private JobState fromStringHash(Map<Object, Object> entries) {
+        JobState.JobStateBuilder builder = JobState.builder();
+        String val;
+
+        val = str(entries, "jobId");       if (val != null) builder.jobId(val);
+        val = str(entries, "sessionId");   if (val != null) builder.sessionId(val);
+        val = str(entries, "status");      if (val != null) builder.status(JobStatus.valueOf(val));
+        val = str(entries, "progress");    if (val != null) builder.progress(Integer.valueOf(val));
+        val = str(entries, "jobType");     if (val != null) builder.jobType(val);
+        val = str(entries, "stage");       if (val != null) builder.stage(JobStage.valueOf(val));
+        val = str(entries, "message");     if (val != null) builder.message(val);
+        val = str(entries, "videoKey");    if (val != null) builder.videoKey(val);
+        val = str(entries, "resultKey");   if (val != null) builder.resultKey(val);
+        val = str(entries, "roiJson");     if (val != null) builder.roiJson(val);
+        val = str(entries, "optionsJson"); if (val != null) builder.optionsJson(val);
+        val = str(entries, "createdAt");   if (val != null) builder.createdAt(Instant.parse(val));
+        val = str(entries, "updatedAt");   if (val != null) builder.updatedAt(Instant.parse(val));
+
+        val = str(entries, "refImageKeys");
+        if (val != null) {
+            try {
+                builder.refImageKeys(objectMapper.readValue(val, new TypeReference<List<String>>() {}));
+            } catch (JsonProcessingException ignored) {}
+        }
+
+        val = str(entries, "previewKeys");
+        if (val != null) {
+            try {
+                builder.previewKeys(objectMapper.readValue(val, new TypeReference<List<String>>() {}));
+            } catch (JsonProcessingException ignored) {}
+        }
+
+        return builder.build();
+    }
+
+    private static String str(Map<Object, Object> map, String key) {
+        Object v = map.get(key);
+        return v != null ? v.toString() : null;
+    }
 }
