@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { JobCreateForm } from '../components/studio/JobCreateForm';
-import { useDemoJobs } from '../hooks/useDemoJobs';
+import { useJobs } from '../hooks/useJobs';
 import { createPreviewJob, getCandidateFrames, getJobStatus } from '../services/api';
 import { formatStage } from '../constants/stage';
 import type { CandidateFrame, JobItem } from '../services/types';
@@ -23,7 +23,7 @@ type UploadedInfo = {
 };
 
 export function WorkspacePage() {
-  const { jobs, loadingJobs, errorMessage, setErrorMessage, prependCreatedJob, downloadResult } = useDemoJobs();
+  const { jobs, loadingJobs, errorMessage, setErrorMessage, prependCreatedJob, downloadResult } = useJobs();
 
   const [tab, setTab] = useState<Tab>('all');
 
