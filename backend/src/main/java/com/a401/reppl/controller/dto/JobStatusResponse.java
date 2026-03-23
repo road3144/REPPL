@@ -12,6 +12,7 @@ import lombok.Getter;
 public class JobStatusResponse {
 
     private String jobId;
+    private String jobType;
     private String status;
     private Integer progress;
     private String stage;
@@ -35,6 +36,7 @@ public class JobStatusResponse {
 
         return JobStatusResponse.builder()
                 .jobId(state.getJobId())
+                .jobType(state.getJobType())
                 .status(state.getStatus() != null ? state.getStatus().name() : null)
                 .progress(state.getProgress())
                 .stage(state.getStage() != null ? state.getStage().name() : null)

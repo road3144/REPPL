@@ -1,12 +1,7 @@
 import { DragEvent, FormEvent, useCallback, useRef, useState } from 'react';
-import {
-  createJob,
-  getImageUploadUrls,
-  getJobStatus,
-  getVideoUploadUrl,
-  JobStatusResponse,
-  uploadWithPresignedUrl
-} from '../../services/demoApi';
+import { createPreviewJob, getJobStatus } from '../../services/api';
+import { getImageUploadUrls, getVideoUploadUrl, uploadToS3 } from '../../services/s3';
+import type { JobStatusResponse } from '../../services/types';
 
 type JobCreateFormProps = {
   onCreated: (status: JobStatusResponse) => void;
@@ -104,7 +99,7 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
         contentType: videoFile.type || 'video/mp4',
         sizeBytes: videoFile.size
       });
-      await uploadWithPresignedUrl(videoFile, videoUpload.upload.video);
+      await uploadToS3(videoFile, videoUpload.upload.video);
 
       setStage('uploading-image');
       const imagesUpload = await getImageUploadUrls([{
@@ -114,7 +109,7 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
       }]);
       const uploadedRefImage = imagesUpload.upload.refImages[0];
       if (!uploadedRefImage) throw new Error('삽입 이미지 업로드 URL 조회에 실패했습니다.');
-      await uploadWithPresignedUrl(refImageFile, uploadedRefImage);
+      await uploadToS3(refImageFile, uploadedRefImage);
 
       // If parent wants to handle candidate selection first, stop here
       if (onUploaded) {
@@ -129,7 +124,7 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
       }
 
       setStage('creating-job');
-      const created = await createJob({
+      const created = await createPreviewJob({
         videoKey: videoUpload.upload.video.key,
         refImageKeys: [uploadedRefImage.key],
         options: { placementPrompt: trimmedPlacementPrompt }
