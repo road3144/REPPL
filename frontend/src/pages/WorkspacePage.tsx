@@ -2,13 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { JobCreateForm } from '../components/studio/JobCreateForm';
 import { useDemoJobs } from '../hooks/useDemoJobs';
-import {
-  CandidateFrame,
-  createJob,
-  getCandidateFrames,
-  getJobStatus,
-  JobItem,
-} from '../services/demoApi';
+import { createPreviewJob, getCandidateFrames, getJobStatus } from '../services/api';
+import { formatStage } from '../constants/stage';
+import type { CandidateFrame, JobItem } from '../services/types';
 
 /* ── Status config ── */
 const STATUS_CFG: Record<string, { label: string; badgeCls: string; progressCls: string }> = {
@@ -80,7 +76,7 @@ export function WorkspacePage() {
     if (!uploadedInfo || !selectedCandidate) return;
     setConfirmingJob(true);
     try {
-      const created = await createJob({
+      const created = await createPreviewJob({
         videoKey: uploadedInfo.videoKey,
         refImageKeys: [uploadedInfo.imageKey],
         options: { placementPrompt: uploadedInfo.prompt },
@@ -410,7 +406,7 @@ function JobCard({ job, onDownload }: { job: JobItem; onDownload: (id: string) =
           </div>
         )}
         {job.stage && (
-          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{job.stage}</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{formatStage(job.stage)}</div>
         )}
         {job.createdAt && (
           <div style={{ fontSize: 11, color: '#ccc', marginTop: 4 }}>

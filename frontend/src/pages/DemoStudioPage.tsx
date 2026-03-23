@@ -1,6 +1,7 @@
 import { NavBar } from '../components/NavBar';
 import { JobCreateForm } from '../components/studio/JobCreateForm';
 import { JobListPanel } from '../components/studio/JobListPanel';
+import { PreviewSelectModal } from '../components/studio/PreviewSelectModal';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import { useDemoJobs } from '../hooks/useDemoJobs';
 
@@ -24,8 +25,21 @@ const pipelineSteps = [
 
 export function DemoStudioPage() {
   const pageRef = useScrollReveal<HTMLDivElement>();
-  const { jobs, running, loadingJobs, errorMessage, setErrorMessage, prependCreatedJob, downloadResult } = useDemoJobs();
-  const completed = jobs.filter((job) => job.status === 'COMPLETED').length;
+  const {
+    jobs,
+    running,
+    loadingJobs,
+    errorMessage,
+    setErrorMessage,
+    prependCreatedJob,
+    downloadResult,
+    previewSelecting,
+    selectingIndex,
+    loadPreviews,
+    handleSelectPreview,
+    closePreviewSelection,
+  } = useDemoJobs();
+  const completed = jobs.filter((job) => job.status === 'COMPLETED' && job.jobType === 'COMPOSITE').length;
 
   const handleDownload = async (jobId: string) => {
     try {
@@ -151,10 +165,26 @@ export function DemoStudioPage() {
           </div>
 
           <div className="animate-on-scroll delay-2">
-            <JobListPanel jobs={jobs} loadingJobs={loadingJobs} onDownload={handleDownload} />
+            <JobListPanel
+              jobs={jobs}
+              loadingJobs={loadingJobs}
+              onDownload={handleDownload}
+              onViewPreviews={loadPreviews}
+            />
           </div>
         </div>
       </section>
+
+      {/* ════════════ Preview Selection Modal ════════════ */}
+      {previewSelecting && (
+        <PreviewSelectModal
+          jobId={previewSelecting.jobId}
+          previews={previewSelecting.previews}
+          selecting={selectingIndex}
+          onSelect={(index: number) => handleSelectPreview(previewSelecting.jobId, index)}
+          onClose={closePreviewSelection}
+        />
+      )}
     </div>
   );
 }
