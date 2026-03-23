@@ -13,6 +13,7 @@ import java.time.Instant;
 public class JobItemResponse {
 
     private String jobId;
+    private String jobType;
     private String status;
     private Integer progress;
     private String stage;
@@ -22,6 +23,7 @@ public class JobItemResponse {
     public static JobItemResponse from(JobState state) {
         return JobItemResponse.builder()
                 .jobId(state.getJobId())
+                .jobType(state.getJobType())
                 .status(state.getStatus() != null ? state.getStatus().name() : null)
                 .progress(state.getProgress())
                 .stage(state.getStage() != null ? state.getStage().name() : null)

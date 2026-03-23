@@ -20,7 +20,7 @@ build-backend:
 build-frontend:
   stage: build
   script:
-    - docker build -t $FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA ./frontend
+    - docker build --build-arg VITE_API_TARGET=https://$EC2_HOST -t $FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA ./frontend
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "master"
