@@ -73,7 +73,8 @@ def validate_prompt(user_prompt: str):
         "contents": [{"parts": [{"text": prompt_text}]}],
         "generationConfig": {
             "temperature": 0.0,
-            "maxOutputTokens": 100,
+            "maxOutputTokens": 1024,
+            "thinkingConfig": {"thinkingBudget": 0},
         },
     }
     headers = {"x-goog-api-key": GMS_API_KEY, "Content-Type": "application/json"}
@@ -83,6 +84,8 @@ def validate_prompt(user_prompt: str):
         resp.raise_for_status()
         result = resp.json()
 
+        log.info(f"GMS 응답 원본: {json.dumps(result, ensure_ascii=False)[:500]}")
+
         # 응답에서 텍스트 추출
         text = ""
         for cand in result.get("candidates", []):
@@ -91,13 +94,13 @@ def validate_prompt(user_prompt: str):
                     text += part["text"]
 
         text = text.strip()
+        log.info(f"GMS 추출 텍스트: '{text}'")
+
         # JSON 블록 추출 (응답에 부가 텍스트가 섞일 수 있음)
         start = text.find("{")
         end = text.rfind("}") + 1
         if start >= 0 and end > start:
             text = text[start:end]
-
-        log.debug(f"프롬프트 검증 응답: {text}")
         parsed = json.loads(text)
 
         if not parsed.get("valid", True):
@@ -110,4 +113,4 @@ def validate_prompt(user_prompt: str):
         raise
     except (requests.RequestException, json.JSONDecodeError, KeyError) as e:
         log.error(f"프롬프트 검증 API 오류: {e}")
-        raise InvalidPromptError("프롬프트 검증에 실패했습니다. 다시 시도해주세요.")
+        raise RuntimeError(f"프롬프트 검증 서버 오류: {e}")

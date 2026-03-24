@@ -75,6 +75,13 @@ def process_preview(event: dict, producer: KafkaProgressProducer):
             f"프롬프트가 유효하지 않습니다: {e.reason}"
         )
         return
+    except RuntimeError as e:
+        log.error(f"프롬프트 검증 서버 오류: {job_id} — {e}")
+        producer.send_progress(
+            job_id, "FAILED", "VALIDATE", 0,
+            "프롬프트 검증 서버에 문제가 발생했습니다. 잠시 후 다시 시도해주세요."
+        )
+        return
 
     local_files = [video_local]
     if img_local:
