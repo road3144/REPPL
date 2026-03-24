@@ -4,6 +4,7 @@ import {
   getJobs,
   getJobStatus,
   getPreviewUrls,
+  initSession,
   selectPreview,
 } from '../services/api';
 import { subscribeJobProgress, WsJobProgress } from '../services/ws';
@@ -56,7 +57,8 @@ export function useJobs() {
     let active = true;
     setLoadingJobs(true);
 
-    getJobs(0, 20)
+    initSession()
+      .then(() => getJobs(0, 20))
       .then((data) => {
         if (!active) return;
         setJobs(

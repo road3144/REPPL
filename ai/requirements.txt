@@ -45,5 +45,6 @@ transformers==4.38.2
 typing_extensions==4.15.0
 urllib3==2.6.3
 yapf==0.43.0
+google-genai
 boto3
 kafka-python

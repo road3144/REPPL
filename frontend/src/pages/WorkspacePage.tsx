@@ -54,21 +54,31 @@ export function WorkspacePage() {
 
   const [tab, setTab] = useState<Tab>('all');
 
+  /* ── Prompt validation modal ── */
+  const [promptError, setPromptError] = useState<string | null>(null);
+
   /* ── Completion toast ── */
   const [toast, setToast] = useState<{ jobId: string } | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevJobsRef = useRef<JobItem[]>([]);
 
-  /* Detect RUNNING/QUEUED → COMPLETED transition */
+  /* Detect status transitions */
   useEffect(() => {
-    const justCompleted = jobs.find(job =>
-      job.status === 'COMPLETED' &&
-      prevJobsRef.current.some(p => p.jobId === job.jobId && (p.status === 'RUNNING' || p.status === 'QUEUED'))
-    );
-    if (justCompleted) {
-      setToast({ jobId: justCompleted.jobId });
-      if (toastTimer.current) clearTimeout(toastTimer.current);
-      toastTimer.current = setTimeout(() => setToast(null), 5000);
+    for (const job of jobs) {
+      const prev = prevJobsRef.current.find(p => p.jobId === job.jobId);
+      if (!prev) continue;
+
+      // VALIDATE 실패 → 모달
+      if (job.status === 'FAILED' && job.stage === 'VALIDATE' && prev.status !== 'FAILED') {
+        setPromptError(job.message ?? '제품 배치와 관련된 프롬프트를 입력해주세요.');
+      }
+
+      // 완료 → 토스트
+      if (job.status === 'COMPLETED' && (prev.status === 'RUNNING' || prev.status === 'QUEUED')) {
+        setToast({ jobId: job.jobId });
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        toastTimer.current = setTimeout(() => setToast(null), 5000);
+      }
     }
     prevJobsRef.current = jobs;
   }, [jobs]);
@@ -185,6 +195,50 @@ export function WorkspacePage() {
           ))}
         </div>
       </div>
+
+      {/* ── PROMPT ERROR MODAL ── */}
+      {promptError && (
+        <>
+          <div
+            onClick={() => setPromptError(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300 }}
+          />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            background: '#fff', borderRadius: 16, padding: '32px 28px', zIndex: 301,
+            width: 400, maxWidth: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+            animation: 'slideUpToast 0.2s ease',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: 'linear-gradient(135deg, #ef4444, #f97316)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 20, flexShrink: 0,
+              }}>!</div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#111', margin: 0 }}>
+                프롬프트를 확인해주세요
+              </h3>
+            </div>
+            <p style={{ fontSize: 14, color: '#555', lineHeight: 1.6, margin: 0 }}>
+              {promptError}
+            </p>
+            <p style={{ fontSize: 12, color: '#999', marginTop: 12, lineHeight: 1.5 }}>
+              예시: "책상 위 빈 공간에 놓아줘", "테이블 오른쪽 컵 옆에 배치해줘"
+            </p>
+            <button
+              onClick={() => setPromptError(null)}
+              style={{
+                marginTop: 20, width: '100%', padding: 12,
+                background: '#4a6cf7', color: '#fff', border: 'none',
+                borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              확인
+            </button>
+          </div>
+        </>
+      )}
 
       {/* ── PREVIEW SELECT MODAL ── */}
       {previewSelecting && (
