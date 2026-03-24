@@ -55,7 +55,19 @@ deploy:
     - docker compose up -d redis zookeeper kafka
     # 앱 컨테이너만 업데이트 (redis, kafka, zookeeper는 유지)
     - docker compose pull backend frontend
-    - docker compose up -d --no-deps backend frontend nginx certbot
+    - docker compose up -d --no-deps backend frontend certbot
+    # backend가 준비될 때까지 대기 후 nginx 재시작 (upstream IP 갱신)
+    - |
+      echo "Waiting for backend to be ready..."
+      for i in $(seq 1 30); do
+        if docker exec backend curl -sf http://localhost:8080/actuator/health > /dev/null 2>&1; then
+          echo "Backend is ready!"
+          break
+        fi
+        echo "  attempt $i/30..."
+        sleep 2
+      done
+    - docker restart nginx
     # 이전 이미지 정리
     - docker image prune -af --filter "until=1h"
   rules:
