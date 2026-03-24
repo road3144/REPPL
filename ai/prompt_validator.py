@@ -91,13 +91,13 @@ def validate_prompt(user_prompt: str):
                     text += part["text"]
 
         text = text.strip()
-        # JSON 블록 추출 (```json ... ``` 형태일 수 있음)
-        if "```" in text:
-            start = text.find("{")
-            end = text.rfind("}") + 1
-            if start >= 0 and end > start:
-                text = text[start:end]
+        # JSON 블록 추출 (응답에 부가 텍스트가 섞일 수 있음)
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start >= 0 and end > start:
+            text = text[start:end]
 
+        log.debug(f"프롬프트 검증 응답: {text}")
         parsed = json.loads(text)
 
         if not parsed.get("valid", True):
@@ -109,4 +109,5 @@ def validate_prompt(user_prompt: str):
     except InvalidPromptError:
         raise
     except (requests.RequestException, json.JSONDecodeError, KeyError) as e:
-        log.warning(f"프롬프트 검증 API 오류 (검증 건너뜀): {e}")
+        log.error(f"프롬프트 검증 API 오류: {e}")
+        raise InvalidPromptError("프롬프트 검증에 실패했습니다. 다시 시도해주세요.")
