@@ -8,6 +8,12 @@ import type {
   PreviewSelectResponse,
 } from './types';
 
+// ── Session ──
+
+export async function initSession(): Promise<void> {
+  await apiFetch<unknown>('/api/v1/session');
+}
+
 // ── Job ──
 
 export async function getJobs(page = 0, size = 20): Promise<JobListResponse> {

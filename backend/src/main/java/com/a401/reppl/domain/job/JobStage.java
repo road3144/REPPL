@@ -4,6 +4,9 @@ package com.a401.reppl.domain.job;
  * Job 처리 단계 정의
  */
 public enum JobStage {
+    // 프롬프트 검증
+    VALIDATE,    // 프롬프트 유효성 검증 중
+
     // 프리뷰 생성 단계
     GEMINI,      // Gemini 모델이 합성 이미지를 생성하는 중
 

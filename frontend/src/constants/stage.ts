@@ -1,4 +1,5 @@
 export const STAGE_LABEL: Record<string, string> = {
+  VALIDATE: '프롬프트 검증',
   GEMINI: '이미지 생성',
   DOWNLOAD: '파일 다운로드',
   DINO: '객체 검출',
