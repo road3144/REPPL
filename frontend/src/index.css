@@ -721,25 +721,6 @@ h6 {
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
-/* ── Example Chips ── */
-.example-chip {
-  border-radius: 9999px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  background: rgba(255, 255, 255, 0.86);
-  color: var(--text-secondary);
-  font-size: 0.68rem;
-  font-weight: 600;
-  padding: 0.3rem 0.6rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.example-chip:hover {
-  border-color: var(--border-active);
-  background: rgba(224, 242, 254, 0.86);
-  color: var(--accent);
-}
-
 /* ── Submit Progress ── */
 .submit-progress-bar {
   height: 3px;
