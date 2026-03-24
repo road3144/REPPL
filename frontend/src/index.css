@@ -811,6 +811,231 @@ h6 {
   background: rgba(255, 255, 255, 0.98);
 }
 
+.job-card-selected {
+  border-color: rgba(74, 108, 247, 0.38);
+  box-shadow: 0 10px 28px rgba(74, 108, 247, 0.10);
+}
+
+.workspace-right-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.workspace-job-list {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.job-stage-panel {
+  width: 360px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.96);
+  border-left: 1px solid #e5e7ef;
+  display: flex;
+  min-height: 0;
+}
+
+.job-stage-panel-inner {
+  width: 100%;
+  overflow-y: auto;
+  padding: 22px 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.job-stage-panel-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #111827;
+  word-break: break-all;
+}
+
+.job-stage-panel-subtitle {
+  margin: 6px 0 0;
+  font-size: 0.84rem;
+  color: #94a3b8;
+}
+
+.job-stage-progress-block {
+  padding-bottom: 2px;
+}
+
+.job-stage-progress-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(226, 232, 240, 0.85);
+  overflow: hidden;
+}
+
+.job-stage-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4a6cf7, #7a9cff);
+  transition: width 0.4s ease;
+}
+
+.job-stage-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.job-stage-section-title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 800;
+  color: #334155;
+}
+
+.job-stage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.job-stage-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.job-stage-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.job-stage-name {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.job-stage-item-done .job-stage-name {
+  color: #475569;
+}
+
+.job-stage-item-current .job-stage-name {
+  color: #4a6cf7;
+  font-weight: 800;
+}
+
+.job-stage-item-failed .job-stage-name {
+  color: #ef4444;
+  font-weight: 800;
+}
+
+.job-stage-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.job-stage-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.job-stage-icon-done {
+  background: rgba(52, 211, 153, 0.16);
+  color: #10b981;
+}
+
+.job-stage-icon-current {
+  background: #4a6cf7;
+  box-shadow: 0 0 0 6px rgba(74, 108, 247, 0.12);
+}
+
+.job-stage-icon-pending {
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+}
+
+.job-stage-icon-failed {
+  background: rgba(251, 113, 133, 0.14);
+  color: #ef4444;
+}
+
+.job-stage-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.job-stage-meta-row:last-child {
+  border-bottom: none;
+}
+
+.job-stage-meta-row span {
+  font-size: 0.88rem;
+  color: #94a3b8;
+}
+
+.job-stage-meta-row strong {
+  flex: 1;
+  text-align: right;
+  font-size: 0.95rem;
+  color: #334155;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.job-stage-meta-running {
+  color: #f59e0b !important;
+}
+
+.job-stage-action-btn {
+  width: 100%;
+  margin-top: 4px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #4a6cf7, #7a9cff);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  padding: 13px 16px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 10px 24px rgba(74, 108, 247, 0.20);
+}
+
+.job-stage-action-btn:hover {
+  transform: translateY(-1px);
+}
+
+.job-stage-action-btn-download {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.18);
+}
+
+.job-stage-empty {
+  border-radius: 16px;
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+  background: rgba(248, 250, 252, 0.9);
+  padding: 28px 18px;
+  text-align: center;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+
 /* ── Status Badge ── */
 .job-status-badge {
   display: inline-flex;
@@ -922,6 +1147,19 @@ h6 {
 .empty-state-icon {
   font-size: 2.5rem;
   opacity: 0.4;
+}
+
+@media (max-width: 1200px) {
+  .workspace-right-content {
+    flex-direction: column;
+  }
+
+  .job-stage-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #e5e7ef;
+    max-height: 340px;
+  }
 }
 
 /* ── Loading Spinner ── */

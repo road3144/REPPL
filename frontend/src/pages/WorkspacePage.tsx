@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { JobCreateForm } from '../components/studio/JobCreateForm';
 import { PreviewSelectModal } from '../components/studio/PreviewSelectModal';
+import { JobStagePanel } from '../components/studio/JobStagePanel';
 import { useJobs } from '../hooks/useJobs';
 import { formatStage } from '../constants/stage';
 import type { JobItem } from '../services/types';
@@ -53,6 +54,7 @@ export function WorkspacePage() {
   } = useJobs();
 
   const [tab, setTab] = useState<Tab>('all');
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
   /* ── Prompt validation modal ── */
   const [promptError, setPromptError] = useState<string | null>(null);
@@ -89,6 +91,25 @@ export function WorkspacePage() {
     if (tab === 'done') return jobs.filter(j => j.status === 'COMPLETED' || j.status === 'FAILED');
     return jobs;
   }, [jobs, tab]);
+
+  useEffect(() => {
+    if (jobs.length === 0) {
+      setSelectedJobId(null);
+      return;
+    }
+
+    if (selectedJobId && jobs.some((job) => job.jobId === selectedJobId)) {
+      return;
+    }
+
+    const nextSelectedJob = jobs.find((job) => job.status === 'RUNNING')
+      ?? jobs.find((job) => job.status === 'QUEUED')
+      ?? jobs[0];
+
+    setSelectedJobId(nextSelectedJob.jobId);
+  }, [jobs, selectedJobId]);
+
+  const selectedJob = jobs.find((job) => job.jobId === selectedJobId) ?? null;
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#f0f2f8' }}>
@@ -169,30 +190,39 @@ export function WorkspacePage() {
           </div>
         </div>
 
-        {/* Job list */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {loadingJobs && (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
-              <div className="loading-spinner" />
-            </div>
-          )}
-          {!loadingJobs && filteredJobs.length === 0 && (
-            <div className="empty-state">
-              <span className="empty-state-icon" aria-hidden="true">
-                <FileStackIcon />
-              </span>
-              <p style={{ fontSize: 14, fontWeight: 600, color: '#64748b' }}>작업이 없습니다</p>
-              <p style={{ fontSize: 12, color: '#94a3b8' }}>왼쪽에서 새 작업을 만들어보세요</p>
-            </div>
-          )}
-          {filteredJobs.map(job => (
-            <JobCard
-              key={job.jobId}
-              job={job}
-              onDownload={downloadResult}
-              onSelectPreview={loadPreviews}
-            />
-          ))}
+        {/* Job list + stage panel */}
+        <div className="workspace-right-content">
+          <div className="workspace-job-list">
+            {loadingJobs && (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
+                <div className="loading-spinner" />
+              </div>
+            )}
+            {!loadingJobs && filteredJobs.length === 0 && (
+              <div className="empty-state">
+                <span className="empty-state-icon" aria-hidden="true">
+                  <FileStackIcon />
+                </span>
+                <p style={{ fontSize: 14, fontWeight: 600, color: '#64748b' }}>작업이 없습니다</p>
+                <p style={{ fontSize: 12, color: '#94a3b8' }}>왼쪽에서 새 작업을 만들어보세요</p>
+              </div>
+            )}
+            {filteredJobs.map(job => (
+              <JobCard
+                key={job.jobId}
+                job={job}
+                selected={job.jobId === selectedJobId}
+                onSelect={() => setSelectedJobId(job.jobId)}
+                onDownload={downloadResult}
+                onSelectPreview={loadPreviews}
+              />
+            ))}
+          </div>
+          <JobStagePanel
+            job={selectedJob}
+            onOpenPreview={loadPreviews}
+            onDownload={(jobId) => { void downloadResult(jobId); }}
+          />
         </div>
       </div>
 
@@ -293,8 +323,10 @@ export function WorkspacePage() {
 }
 
 /* ── Job Card component ── */
-function JobCard({ job, onDownload, onSelectPreview }: {
+function JobCard({ job, selected, onSelect, onDownload, onSelectPreview }: {
   job: JobItem;
+  selected: boolean;
+  onSelect: () => void;
   onDownload: (id: string) => Promise<void>;
   onSelectPreview: (id: string) => void;
 }) {
@@ -304,7 +336,11 @@ function JobCard({ job, onDownload, onSelectPreview }: {
   const isCompositeCompleted = job.jobType === 'COMPOSITE' && job.status === 'COMPLETED';
 
   return (
-    <div className="job-card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+    <div
+      className={`job-card ${selected ? 'job-card-selected' : ''}`}
+      style={{ display: 'flex', alignItems: 'center', gap: 16, cursor: 'pointer' }}
+      onClick={onSelect}
+    >
       {/* Thumbnail */}
       <div style={{
         width: 80, height: 52, borderRadius: 8,
@@ -359,12 +395,12 @@ function JobCard({ job, onDownload, onSelectPreview }: {
           <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>{progress}%</span>
         )}
         {isPreviewCompleted && (
-          <button className="download-btn" onClick={() => onSelectPreview(job.jobId)}>
+          <button className="download-btn" onClick={(event) => { event.stopPropagation(); onSelectPreview(job.jobId); }}>
             프리뷰 선택
           </button>
         )}
         {isCompositeCompleted && (
-          <button className="download-btn" onClick={() => onDownload(job.jobId)}>
+          <button className="download-btn" onClick={(event) => { event.stopPropagation(); void onDownload(job.jobId); }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M12 5v14M5 12l7 7 7-7" />
             </svg>
