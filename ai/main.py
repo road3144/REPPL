@@ -396,70 +396,37 @@ def _extract_image_from_response(response):
 
 
 def _analyze_frame_for_prompt(frame):
-    """
-    원본 프레임의 시각적 특성을 분석하여 Gemini 프롬프트용 텍스트 설명을 반환한다.
-    Gemini가 생성 단계에서부터 원본 화질에 맞춰 합성하도록 유도.
-    """
+    """원본 프레임의 시각적 특성을 분석하여 Gemini 프롬프트용 설명을 반환."""
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     h, w = gray.shape
-
-    # 1) 선명도 (라플라시안 분산)
     lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-    if lap_var > 500:
-        sharpness = "sharp and high-definition"
-    elif lap_var > 200:
-        sharpness = "moderately sharp (typical broadcast/streaming quality)"
-    elif lap_var > 50:
-        sharpness = "slightly soft and blurry (compressed video quality)"
-    else:
-        sharpness = "very soft and blurry (low-quality or heavily compressed)"
-
-    # 2) 밝기 / 노출
+    if lap_var > 500: sharpness = "sharp and high-definition"
+    elif lap_var > 200: sharpness = "moderately sharp (typical broadcast/streaming quality)"
+    elif lap_var > 50: sharpness = "slightly soft and blurry (compressed video quality)"
+    else: sharpness = "very soft and blurry (low-quality or heavily compressed)"
     mean_brightness = gray.mean()
-    if mean_brightness > 180:
-        brightness = "brightly lit / slightly overexposed"
-    elif mean_brightness > 120:
-        brightness = "well-lit with normal exposure"
-    elif mean_brightness > 70:
-        brightness = "moderately dim / indoor lighting"
-    else:
-        brightness = "dark / low-light scene"
-
-    # 3) 색온도 추정 (BGR 평균 비율)
+    if mean_brightness > 180: brightness = "brightly lit / slightly overexposed"
+    elif mean_brightness > 120: brightness = "well-lit with normal exposure"
+    elif mean_brightness > 70: brightness = "moderately dim / indoor lighting"
+    else: brightness = "dark / low-light scene"
     b, g, r = cv2.mean(frame)[:3]
-    if r > b + 15:
-        color_temp = "warm-toned (yellowish/orange indoor lighting)"
-    elif b > r + 15:
-        color_temp = "cool-toned (bluish/daylight)"
-    else:
-        color_temp = "neutral color temperature"
-
-    # 4) 대비
+    if r > b + 15: color_temp = "warm-toned (yellowish/orange indoor lighting)"
+    elif b > r + 15: color_temp = "cool-toned (bluish/daylight)"
+    else: color_temp = "neutral color temperature"
     contrast = gray.std()
-    if contrast > 60:
-        contrast_desc = "high contrast"
-    elif contrast > 35:
-        contrast_desc = "moderate contrast"
-    else:
-        contrast_desc = "low contrast / flat lighting"
-
-    # 5) 노이즈 수준
+    if contrast > 60: contrast_desc = "high contrast"
+    elif contrast > 35: contrast_desc = "moderate contrast"
+    else: contrast_desc = "low contrast / flat lighting"
     patch = gray[h // 4: 3 * h // 4, w // 4: 3 * w // 4]
-    high_freq = cv2.Laplacian(patch, cv2.CV_64F)
-    noise_level = np.median(np.abs(high_freq)) / 0.6745
-    if noise_level > 8:
-        noise_desc = "noticeable grain/noise"
-    elif noise_level > 3:
-        noise_desc = "slight compression noise"
-    else:
-        noise_desc = "clean with minimal noise"
-
-    desc = (
+    noise_level = np.median(np.abs(cv2.Laplacian(patch, cv2.CV_64F))) / 0.6745
+    if noise_level > 8: noise_desc = "noticeable grain/noise"
+    elif noise_level > 3: noise_desc = "slight compression noise"
+    else: noise_desc = "clean with minimal noise"
+    return (
         f"Image quality: {sharpness}, {brightness}, {color_temp}, "
         f"{contrast_desc}, {noise_desc}. "
         f"(Sharpness={lap_var:.0f}, Brightness={mean_brightness:.0f}, Noise={noise_level:.1f})"
     )
-    return desc
 
 
 def _build_gemini_prompt(kw, w1, h1, user_prompt, frame_quality_desc=""):
@@ -477,12 +444,10 @@ def _build_gemini_prompt(kw, w1, h1, user_prompt, frame_quality_desc=""):
             f"- Match the SAME level of sharpness/softness — if the background is blurry "
             f"or soft from video compression, the added object must also appear equally soft. "
             f"Do NOT render the object in crisp high-definition if the background is low-quality.\n"
-            f"- Match the SAME color temperature and white balance — if the scene has warm "
-            f"yellowish indoor lighting, the object must reflect that same warm tone.\n"
+            f"- Match the SAME color temperature and white balance.\n"
             f"- Match the SAME brightness, contrast, and exposure level.\n"
             f"- Match the SAME noise/grain texture if visible.\n"
-            f"- The object should look like it was FILMED by the same camera in the same scene, "
-            f"not like a clean product photo pasted on top.\n"
+            f"- The object should look like it was FILMED by the same camera in the same scene.\n"
         )
 
     return (
@@ -727,18 +692,15 @@ def _sam_segment(frame, bbox, fg_points=None):
         coords, labels = [], []
 
         if fg_points and len(fg_points) > 0:
-            # Diff에서 전달받은 foreground 포인트 사용
             for px, py in fg_points:
                 coords.append([np.clip(px, 0, fw - 1), np.clip(py, 0, fh - 1)])
-                labels.append(1)  # foreground
+                labels.append(1)
             log.info(f"SAM fg 포인트: Diff 기반 {len(fg_points)}개")
         else:
-            # 기본: bbox 중앙 1개
             cx, cy = x + w // 2, y + h // 2
             coords.append([np.clip(cx, 0, fw - 1), np.clip(cy, 0, fh - 1)])
             labels.append(1)
 
-        # 외곽 bg 포인트
         cx_bg, cy_bg = x + w // 2, y + h // 2
         m = 20
         for bxp, byp in [
@@ -748,7 +710,7 @@ def _sam_segment(frame, bbox, fg_points=None):
             (min(fw - 1, x + w + m), cy_bg),
         ]:
             coords.append([bxp, byp])
-            labels.append(0)  # background
+            labels.append(0)
 
         masks, scores, _ = predictor.predict(
             point_coords=np.array(coords),
@@ -925,117 +887,127 @@ def extract_shadow_map(f1, f2, mask):
              f"검증된 그림자: {np.sum(valid_shadow > 0)}px)")
     return shadow_map
 
-def _semantic_diff_analyze(first_frame, generated_frame, keyword):
+def _diff_analyze(first_frame, generated_frame):
     """
-    단순 전역 픽셀 비교가 아닌 의미론적(Semantic) 비교를 수행한다.
-    1. DINO를 사용하여 합성 이미지에서 객체 후보(BBox)들을 찾는다.
-    2. 각 후보 BBox 내부에서만 원본 대비 픽셀 변화량을 측정한다.
-    3. 전역 조명 변화/배경 노이즈를 무시하고 실질적으로 '새롭게 등장한' 객체를 확정한다.
+    first_frame과 generated_frame의 픽셀 차이를 분석하여
+    추가된 객체의 bbox와 foreground 포인트 힌트를 반환한다.
+    
+    핵심: 평균 diff 강도 × √면적 스코어로 진짜 추가된 객체를 구분.
+    
+    반환: (bbox, fg_points) 또는 None
     """
     h1, w1 = first_frame.shape[:2]
     h2, w2 = generated_frame.shape[:2]
     if (h1, w1) != (h2, w2):
-        f1_align = cv2.resize(first_frame, (w2, h2), interpolation=cv2.INTER_AREA)
+        first_resized = cv2.resize(first_frame, (w2, h2), interpolation=cv2.INTER_AREA)
     else:
-        f1_align = first_frame
+        first_resized = first_frame
 
-    log.info(f"의미론적 객체 탐색: '{keyword}' 후보 찾는 중...")
-    try:
-        bboxes = _dino_detect(generated_frame, keyword)
-    except Exception as e:
-        log.warning(f"DINO가 합성 프레임에서 '{keyword}' 탐지 실패: {e}")
+    lab1 = cv2.cvtColor(first_resized, cv2.COLOR_BGR2Lab).astype(np.float32)
+    lab2 = cv2.cvtColor(generated_frame, cv2.COLOR_BGR2Lab).astype(np.float32)
+    color_diff = np.sqrt(np.sum((lab1 - lab2) ** 2, axis=2))
+
+    threshold = max(np.percentile(color_diff, 97), 20)
+    binary = (color_diff > threshold).astype(np.uint8) * 255
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=2)
+    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel, iterations=2)
+
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary, 8)
+    if num_labels <= 1:
         return None
 
-    if not bboxes:
-        return None
-
-    # 미세 노이즈 무시를 위해 약간의 블러 적용 후 Lab 색 공간 비교
-    blur1 = cv2.GaussianBlur(f1_align, (11, 11), 0)
-    blur2 = cv2.GaussianBlur(generated_frame, (11, 11), 0)
-    lab1 = cv2.cvtColor(blur1, cv2.COLOR_BGR2Lab).astype(np.float32)
-    lab2 = cv2.cvtColor(blur2, cv2.COLOR_BGR2Lab).astype(np.float32)
-    diff_map = np.sqrt(np.sum((lab1 - lab2) ** 2, axis=2))
-
-    best_score = -1
-    best_bbox = None
-    best_fg_points = []
-    
-    for i, bb in enumerate(bboxes):
-        x, y, w, h = bb
-        roi_diff = diff_map[y:y+h, x:x+w]
-        if roi_diff.size == 0:
+    # ── 스코어링: 진짜 추가된 객체 vs 배경 노이즈 구분 ──
+    total_pixels = h2 * w2
+    candidates = []
+    for i in range(1, num_labels):
+        area = stats[i, cv2.CC_STAT_AREA]
+        if area < 300:
             continue
-            
-        # 해당 BBox 내에서 픽셀 변화가 가장 큰 상위 30% 영역의 평균 변화량 계산
-        flat_diff = np.sort(roi_diff.flatten())[::-1]
-        top_k = max(1, len(flat_diff) // 3)
-        mean_diff = flat_diff[:top_k].mean()
-        
-        # 작은 노이즈가 높은 평균을 가지는 것을 막기 위해 면적 가중치 추가
-        score = mean_diff * np.sqrt(w * h)
-        log.info(f"후보 {i+1} {bb} - 상위 변화율: {mean_diff:.1f}, 스코어: {score:.0f}")
-        
-        if score > best_score:
-            best_score = score
-            best_bbox = bb
-            
-            # Foreground 힌트 포인트 추출 (가장 뚜렷하게 변한 픽셀들)
-            hot_threshold = np.percentile(roi_diff, 85)
-            ys, xs = np.where(roi_diff >= hot_threshold)
-            fg = []
-            if len(xs) > 0:
-                p_count = min(5, len(xs))
-                indices = np.linspace(0, len(xs)-1, p_count, dtype=int)
-                for idx in indices:
-                    fg.append((int(x + xs[idx]), int(y + ys[idx])))
-            
-            # 중앙점 하나를 확실하게 추가
-            cx, cy = x + w // 2, y + h // 2
-            if fg:
-                fg[0] = (cx, cy)
-            else:
-                fg.append((cx, cy))
-            best_fg_points = fg
+        comp_mask = (labels == i)
+        mean_diff = color_diff[comp_mask].mean()
+        score = mean_diff * np.sqrt(area)
+        candidates.append((i, score, mean_diff, area))
 
-    # 원본 대비 유의미한 변화가 없다면(기존 배경의 객체를 잡았다면) 무시
-    if best_score < 50:
-        log.warning("감지된 객체들이 원본과 너무 동일합니다 (유의미한 추가 객체 아님).")
+    if not candidates:
         return None
 
-    log.info(f"선택 완료! 새로운 객체: BBox={best_bbox}, fg_points={len(best_fg_points)}개")
-    return best_bbox, best_fg_points
+    candidates.sort(key=lambda x: x[1], reverse=True)
+    best_label, best_score, best_mean_diff, best_area = candidates[0]
+
+    if best_area < total_pixels * 0.001:
+        log.info(f"Diff: 최고 스코어 영역 너무 작음 ({best_area}px)")
+        return None
+
+    bx = stats[best_label, cv2.CC_STAT_LEFT]
+    by = stats[best_label, cv2.CC_STAT_TOP]
+    bw = stats[best_label, cv2.CC_STAT_WIDTH]
+    bh = stats[best_label, cv2.CC_STAT_HEIGHT]
+
+    pad = int(max(bw, bh) * 0.2)
+    bx = max(0, bx - pad)
+    by = max(0, by - pad)
+    bw = min(bw + 2 * pad, w2 - bx)
+    bh = min(bh + 2 * pad, h2 - by)
+
+    # ── Foreground 포인트: 컴포넌트 내 diff 상위 픽셀들 ──
+    comp_mask = (labels == best_label).astype(np.uint8)
+    masked_diff = color_diff * comp_mask
+    hot_threshold = np.percentile(masked_diff[comp_mask > 0], 80)
+    ys, xs = np.where(masked_diff >= hot_threshold)
+
+    if len(xs) == 0:
+        return None
+
+    n_points = min(5, len(xs))
+    indices = np.linspace(0, len(xs) - 1, n_points, dtype=int)
+    fg_points = [(int(xs[i]), int(ys[i])) for i in indices]
+
+    cx_fg = int(np.median(xs))
+    cy_fg = int(np.median(ys))
+    fg_points.insert(0, (cx_fg, cy_fg))
+
+    log.info(f"Diff ✅: score={best_score:.0f} (mean_diff={best_mean_diff:.1f}, area={best_area}), "
+             f"bbox=({bx},{by},{bw},{bh}), fg_points={len(fg_points)}개")
+    if len(candidates) > 1:
+        runner_up = candidates[1]
+        log.info(f"  2위: score={runner_up[1]:.0f} (mean_diff={runner_up[2]:.1f}, area={runner_up[3]}) — 배제")
+
+    return (bx, by, bw, bh), fg_points
 
 
 def step4_extract(first_frame, generated_frame, keyword):
     """
-    추가된 객체 추출.
-    DINO를 이용해 의미론적 후보를 찾은 뒤, 원본과 변화량이 가장 큰 객체를 추출.
+    추가된 객체 추출. 하이브리드 전략:
+      1) Diff로 bbox + foreground 포인트 추출 (스코어링)
+      2) SAM에 bbox + fg 포인트를 전달하여 정밀 마스크 추출
+      폴백: Diff 실패 시 DINO bbox → SAM
     """
     fh, fw = generated_frame.shape[:2]
 
-    log.info("객체 추출: 의미론적 객체 비교(Semantic Diff) 진행 중...")
-    diff_result = _semantic_diff_analyze(first_frame, generated_frame, keyword)
-
-    combined_mask = np.zeros((fh, fw), dtype=np.uint8)
+    # ── Diff 분석: bbox + foreground 포인트 ──
+    log.info("객체 추출: Diff로 변경 영역 + fg 포인트 분석...")
+    diff_result = _diff_analyze(first_frame, generated_frame)
 
     if diff_result is not None:
         diff_bbox, fg_points = diff_result
-        log.info(f"의미론적 추가 객체 발견 → SAM에 힌트 포인트 전달...")
+        log.info(f"Diff bbox 발견 → SAM에 fg 포인트 {len(fg_points)}개 전달...")
         combined_mask = _sam_segment(generated_frame, diff_bbox, fg_points=fg_points)
         combined_mask = _refine_mask(combined_mask, generated_frame, diff_bbox)
+        log.info("Diff + SAM 하이브리드 추출 완료")
     else:
-        log.warning("의미론적 객체 비교 실패 — DINO 전체 객체 SAM 폴백 진행...")
-        try:
-            all_bboxes = _dino_detect(generated_frame, keyword)
-            for i, bb in enumerate(all_bboxes):
-                log.info(f"SAM 세그멘테이션 [{i+1}/{len(all_bboxes)}]: bbox={bb}")
-                mask_i = _sam_segment(generated_frame, bb)
-                mask_i = _refine_mask(mask_i, generated_frame, bb)
-                combined_mask = cv2.bitwise_or(combined_mask, mask_i)
-            log.info(f"마스크 결합 완료: {len(all_bboxes)}개 객체")
-        except Exception as e:
-            log.error(f"폴백 DINO 탐지마저 실패했습니다: {e}")
-            raise RuntimeError("객체를 추출할 수 없습니다.")
+        # ── 폴백: DINO + SAM ──
+        log.info("Diff 탐색 불충분 — DINO + SAM 폴백...")
+        all_bboxes = _dino_detect(generated_frame, keyword)
+
+        combined_mask = np.zeros((fh, fw), dtype=np.uint8)
+        for i, bb in enumerate(all_bboxes):
+            log.info(f"SAM 세그멘테이션 [{i+1}/{len(all_bboxes)}]: bbox={bb}")
+            mask_i = _sam_segment(generated_frame, bb)
+            mask_i = _refine_mask(mask_i, generated_frame, bb)
+            combined_mask = cv2.bitwise_or(combined_mask, mask_i)
+        log.info(f"마스크 결합 완료: {len(all_bboxes)}개 객체")
 
     # 그림자 추출
     eroded_mask = cv2.erode(combined_mask, np.ones((5, 5), np.uint8), iterations=1)
