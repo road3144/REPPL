@@ -12,6 +12,11 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     },
   });
 
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(`서버 응답 오류 (${response.status})`);
+  }
+
   const payload = (await response.json()) as ApiResponse<T>;
 
   if (!response.ok || !payload.success) {

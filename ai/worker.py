@@ -23,6 +23,7 @@ from kafka_client import KafkaJobConsumer, KafkaProgressProducer
 from s3_client import download_file, upload_file
 
 from main import INPUTS, OUTPUTS, generate_previews, run_composite
+from prompt_validator import validate_prompt, InvalidPromptError
 
 logging.basicConfig(
     level=logging.INFO,
@@ -63,6 +64,17 @@ def process_preview(event: dict, producer: KafkaProgressProducer):
     img_local = os.path.join(INPUTS, os.path.basename(images_s3[0]["key"])) if images_s3 else None
 
     log.info(f"=== 프리뷰 Job 시작: {job_id} ===")
+
+    # ── 프롬프트 검증 ──
+    try:
+        validate_prompt(prompt)
+    except InvalidPromptError as e:
+        log.warning(f"프롬프트 검증 실패: {job_id} — {e.reason}")
+        producer.send_progress(
+            job_id, "FAILED", "VALIDATE", 0,
+            f"프롬프트가 유효하지 않습니다: {e.reason}"
+        )
+        return
 
     local_files = [video_local]
     if img_local:
