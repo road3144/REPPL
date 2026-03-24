@@ -52,129 +52,100 @@ export function WorkspacePage() {
   }, [jobs, tab]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#f0f2f8' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#f0f2f8' }}>
 
-      {/* ── TOP NAV ── */}
-      <nav style={{
-        height: 56, background: '#fff', borderBottom: '1px solid #e5e7ef',
-        display: 'flex', alignItems: 'center', padding: '0 24px', flexShrink: 0,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+      {/* LEFT PANEL — 새 작업 만들기 */}
+      <div style={{
+        width: 400, flexShrink: 0, background: '#fff', borderRight: '1px solid #e5e7ef',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
-        <Link to="/" style={{ textDecoration: 'none' }}>
-          <span style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: 18, fontWeight: 900, color: '#111',
-            paddingRight: 20, borderRight: '1px solid #eee', letterSpacing: '-0.5px',
-          }}>
-            RE:<span style={{ color: '#4a6cf7' }}>PPL</span>
-          </span>
-        </Link>
-        <div style={{ paddingLeft: 20, fontSize: 14, color: '#aaa', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span>홈</span>
-          <span style={{ color: '#ddd' }}>›</span>
-          <span style={{ color: '#111', fontWeight: 600 }}>작업</span>
+        <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0f0f5' }}>
+          <Link to="/" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: 18 }}>
+            <span className="nav-logo">
+              <span>Re:PPL</span>
+            </span>
+          </Link>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#111', margin: 0 }}>새 작업 만들기</h2>
+          <p style={{ fontSize: 12, color: '#999', marginTop: 4 }}>영상과 광고 이미지를 업로드하세요</p>
         </div>
-        <div style={{ marginLeft: 'auto' }}>
+
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <JobCreateForm
+            onCreated={prependCreatedJob}
+            onError={setErrorMessage}
+            className="p-5"
+          />
+        </div>
+
+        {errorMessage && (
           <div style={{
-            width: 34, height: 34, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #4a6cf7, #7a9cff)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontSize: 13, fontWeight: 700,
-          }}>U</div>
-        </div>
-      </nav>
+            padding: '10px 20px', background: '#fff5f5', borderTop: '1px solid #fecaca',
+            fontSize: 12, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ flex: 1 }}>{errorMessage}</span>
+            <button
+              onClick={() => setErrorMessage(null)}
+              style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 700, cursor: 'pointer', fontSize: 16 }}
+            >×</button>
+          </div>
+        )}
+      </div>
 
-      {/* ── APP BODY ── */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {/* RIGHT PANEL — 나의 작업들 */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
-        {/* LEFT PANEL — 새 작업 만들기 */}
+        {/* Header + filter tabs */}
         <div style={{
-          width: 400, flexShrink: 0, background: '#fff', borderRight: '1px solid #e5e7ef',
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          padding: '16px 24px', background: '#fff', borderBottom: '1px solid #e5e7ef',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
         }}>
-          <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0f0f5' }}>
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: '#111', margin: 0 }}>새 작업 만들기</h2>
-            <p style={{ fontSize: 12, color: '#999', marginTop: 4 }}>영상과 광고 이미지를 업로드하세요</p>
+          <div>
+            <span style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>나의 작업들</span>
+            <span style={{ fontSize: 13, color: '#aaa', marginLeft: 8 }}>· {jobs.length}개</span>
           </div>
-
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            <JobCreateForm
-              onCreated={prependCreatedJob}
-              onError={setErrorMessage}
-              className="p-5"
-            />
-          </div>
-
-          {errorMessage && (
-            <div style={{
-              padding: '10px 20px', background: '#fff5f5', borderTop: '1px solid #fecaca',
-              fontSize: 12, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <span style={{ flex: 1 }}>{errorMessage}</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {([
+              ['all', '전체'],
+              ['running', '처리 중'],
+              ['waiting', '대기 중'],
+              ['done', '완료'],
+            ] as [Tab, string][]).map(([t, label]) => (
               <button
-                onClick={() => setErrorMessage(null)}
-                style={{ background: 'none', border: 'none', color: '#ef4444', fontWeight: 700, cursor: 'pointer', fontSize: 16 }}
-              >×</button>
-            </div>
-          )}
-        </div>
-
-        {/* RIGHT PANEL — 나의 작업들 */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
-          {/* Header + filter tabs */}
-          <div style={{
-            padding: '16px 24px', background: '#fff', borderBottom: '1px solid #e5e7ef',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
-          }}>
-            <div>
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>나의 작업들</span>
-              <span style={{ fontSize: 13, color: '#aaa', marginLeft: 8 }}>· {jobs.length}개</span>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {([
-                ['all', '전체'],
-                ['running', '처리 중'],
-                ['waiting', '대기 중'],
-                ['done', '완료'],
-              ] as [Tab, string][]).map(([t, label]) => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  style={{
-                    padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                    background: tab === t ? '#4a6cf7' : '#f0f2f8',
-                    color: tab === t ? '#fff' : '#888',
-                    border: 'none', cursor: 'pointer', transition: 'all 0.15s',
-                  }}
-                >{label}</button>
-              ))}
-            </div>
-          </div>
-
-          {/* Job list */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {loadingJobs && (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
-                <div className="loading-spinner" />
-              </div>
-            )}
-            {!loadingJobs && filteredJobs.length === 0 && (
-              <div className="empty-state">
-                <span className="empty-state-icon">📋</span>
-                <p style={{ fontSize: 14, fontWeight: 600, color: '#64748b' }}>작업이 없습니다</p>
-                <p style={{ fontSize: 12, color: '#94a3b8' }}>왼쪽에서 새 작업을 만들어보세요</p>
-              </div>
-            )}
-            {filteredJobs.map(job => (
-              <JobCard
-                key={job.jobId}
-                job={job}
-                onDownload={downloadResult}
-                onSelectPreview={loadPreviews}
-              />
+                key={t}
+                onClick={() => setTab(t)}
+                style={{
+                  padding: '5px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                  background: tab === t ? '#4a6cf7' : '#f0f2f8',
+                  color: tab === t ? '#fff' : '#888',
+                  border: 'none', cursor: 'pointer', transition: 'all 0.15s',
+                }}
+              >{label}</button>
             ))}
           </div>
+        </div>
+
+        {/* Job list */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {loadingJobs && (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
+              <div className="loading-spinner" />
+            </div>
+          )}
+          {!loadingJobs && filteredJobs.length === 0 && (
+            <div className="empty-state">
+              <span className="empty-state-icon">📋</span>
+              <p style={{ fontSize: 14, fontWeight: 600, color: '#64748b' }}>작업이 없습니다</p>
+              <p style={{ fontSize: 12, color: '#94a3b8' }}>왼쪽에서 새 작업을 만들어보세요</p>
+            </div>
+          )}
+          {filteredJobs.map(job => (
+            <JobCard
+              key={job.jobId}
+              job={job}
+              onDownload={downloadResult}
+              onSelectPreview={loadPreviews}
+            />
+          ))}
         </div>
       </div>
 
