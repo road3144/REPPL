@@ -11,19 +11,12 @@ type JobCreateFormProps = {
   className?: string;
 };
 
-const examplePrompts = [
-  '테이블 오른쪽 위 컵 옆에 배치',
-  '소파 왼쪽 팔걸이 위에 놓기',
-  '바닥에 자연스럽게 그림자 포함',
-  '인물 손 앞쪽에 배치',
-];
-
 type SubmitStage = 'idle' | 'uploading-video' | 'uploading-image' | 'creating-job';
 const stageLabel: Record<SubmitStage, string> = {
-  idle: 'AI 분석 시작',
+  idle: '합성 시작',
   'uploading-video': '영상 업로드 중...',
   'uploading-image': '이미지 업로드 중...',
-  'creating-job': '작업 생성 중...',
+  'creating-job': '합성 작업 생성 중...',
 };
 
 function VideoFileIcon({ className = 'w-5 h-5' }: { className?: string }) {
@@ -278,18 +271,6 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
             rows={4}
             className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-400 transition focus:ring"
           />
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {examplePrompts.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                className="example-chip"
-                onClick={() => setPlacementPrompt((prev) => prev ? `${prev}, ${prompt}` : prompt)}
-              >
-                + {prompt}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
