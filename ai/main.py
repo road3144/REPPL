@@ -395,8 +395,96 @@ def _extract_image_from_response(response):
     return None
 
 
-def _build_gemini_prompt(kw, w1, h1, user_prompt):
+def _analyze_frame_for_prompt(frame):
+    """
+    원본 프레임의 시각적 특성을 분석하여 Gemini 프롬프트용 텍스트 설명을 반환한다.
+    Gemini가 생성 단계에서부터 원본 화질에 맞춰 합성하도록 유도.
+    """
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape
+
+    # 1) 선명도 (라플라시안 분산)
+    lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+    if lap_var > 500:
+        sharpness = "sharp and high-definition"
+    elif lap_var > 200:
+        sharpness = "moderately sharp (typical broadcast/streaming quality)"
+    elif lap_var > 50:
+        sharpness = "slightly soft and blurry (compressed video quality)"
+    else:
+        sharpness = "very soft and blurry (low-quality or heavily compressed)"
+
+    # 2) 밝기 / 노출
+    mean_brightness = gray.mean()
+    if mean_brightness > 180:
+        brightness = "brightly lit / slightly overexposed"
+    elif mean_brightness > 120:
+        brightness = "well-lit with normal exposure"
+    elif mean_brightness > 70:
+        brightness = "moderately dim / indoor lighting"
+    else:
+        brightness = "dark / low-light scene"
+
+    # 3) 색온도 추정 (BGR 평균 비율)
+    b, g, r = cv2.mean(frame)[:3]
+    if r > b + 15:
+        color_temp = "warm-toned (yellowish/orange indoor lighting)"
+    elif b > r + 15:
+        color_temp = "cool-toned (bluish/daylight)"
+    else:
+        color_temp = "neutral color temperature"
+
+    # 4) 대비
+    contrast = gray.std()
+    if contrast > 60:
+        contrast_desc = "high contrast"
+    elif contrast > 35:
+        contrast_desc = "moderate contrast"
+    else:
+        contrast_desc = "low contrast / flat lighting"
+
+    # 5) 노이즈 수준
+    patch = gray[h // 4: 3 * h // 4, w // 4: 3 * w // 4]
+    high_freq = cv2.Laplacian(patch, cv2.CV_64F)
+    noise_level = np.median(np.abs(high_freq)) / 0.6745
+    if noise_level > 8:
+        noise_desc = "noticeable grain/noise"
+    elif noise_level > 3:
+        noise_desc = "slight compression noise"
+    else:
+        noise_desc = "clean with minimal noise"
+
+    desc = (
+        f"Image quality: {sharpness}, {brightness}, {color_temp}, "
+        f"{contrast_desc}, {noise_desc}. "
+        f"(Sharpness={lap_var:.0f}, Brightness={mean_brightness:.0f}, Noise={noise_level:.1f})"
+    )
+    return desc
+
+
+def _build_gemini_prompt(kw, w1, h1, user_prompt, frame_quality_desc=""):
     """Gemini에 전달할 이미지 합성 프롬프트를 생성한다. 사용자 원문을 직접 전달."""
+
+    quality_section = ""
+    if frame_quality_desc:
+        quality_section = (
+            f"\n"
+            f"===== VISUAL QUALITY MATCHING (CRITICAL) =====\n"
+            f"The background image (Image 1) has these characteristics:\n"
+            f"{frame_quality_desc}\n"
+            f"\n"
+            f"You MUST make the composited {kw} visually blend with Image 1:\n"
+            f"- Match the SAME level of sharpness/softness — if the background is blurry "
+            f"or soft from video compression, the added object must also appear equally soft. "
+            f"Do NOT render the object in crisp high-definition if the background is low-quality.\n"
+            f"- Match the SAME color temperature and white balance — if the scene has warm "
+            f"yellowish indoor lighting, the object must reflect that same warm tone.\n"
+            f"- Match the SAME brightness, contrast, and exposure level.\n"
+            f"- Match the SAME noise/grain texture if visible.\n"
+            f"- The object should look like it was FILMED by the same camera in the same scene, "
+            f"not like a clean product photo pasted on top.\n"
+        )
+
     return (
         f"I am giving you two images.\n"
         f"Image 1: a {w1}x{h1} LANDSCAPE background photo.\n"
@@ -412,6 +500,7 @@ def _build_gemini_prompt(kw, w1, h1, user_prompt):
         f"tiles, people, lighting, or any other element. "
         f"If you compare the output with Image 1, the ONLY difference should be "
         f"the newly added {kw}.\n"
+        f"{quality_section}"
         f"\n"
         f"===== TASK =====\n"
         f"Read the user's Korean request above. It specifies WHERE to place the {kw}. "
@@ -478,8 +567,10 @@ def step3_gemini(video_path, obj_img_path, kw, user_prompt=""):
             ".env에 GOOGLE_CLOUD_PROJECT (Vertex AI) 또는 GEMINI_API_KEY를 설정하세요."
         )
 
-    # ── Gemini 프롬프트 (사용자 원문 직접 전달) ──
-    gemini_prompt = _build_gemini_prompt(kw, w1, h1, user_prompt)
+    # ── 원본 화질 분석 + Gemini 프롬프트 ──
+    quality_desc = _analyze_frame_for_prompt(f1)
+    log.info(f"원본 화질: {quality_desc}")
+    gemini_prompt = _build_gemini_prompt(kw, w1, h1, user_prompt, quality_desc)
 
     first_pil = _cv2_to_pil(f1, max_side=1280)
     obj_pil = _load_obj_as_pil(obj_img_path, max_side=512)
@@ -606,10 +697,10 @@ def _dino_detect(frame, keyword):
     return all_bboxes
 
 
-def _sam_segment(frame, bbox):
+def _sam_segment(frame, bbox, fg_points=None):
     """
     SAM으로 정밀 마스크를 추출한다.
-    SAM2 또는 SAM1을 사용. 폴백 없음.
+    fg_points: 선택적 foreground 좌표 힌트 [(x,y), ...] — Diff에서 전달
     """
     x, y, w, h = bbox
     fh, fw = frame.shape[:2]
@@ -633,19 +724,28 @@ def _sam_segment(frame, bbox):
         predictor = SamPredictor(sam)
         predictor.set_image(rgb)
 
-        # bbox + 내부 중앙 1개 fg 포인트만 사용. 3x3 그리드는 외곽을 파먹거나 배경을 찍어 누끼를 망칠 확률이 높음.
         coords, labels = [], []
-        cx, cy = x + w // 2, y + h // 2
-        coords.append([np.clip(cx, 0, fw - 1), np.clip(cy, 0, fh - 1)])
-        labels.append(1)  # foreground
 
-        # 외곽 bg 포인트 (여유값 20으로 늘림)
+        if fg_points and len(fg_points) > 0:
+            # Diff에서 전달받은 foreground 포인트 사용
+            for px, py in fg_points:
+                coords.append([np.clip(px, 0, fw - 1), np.clip(py, 0, fh - 1)])
+                labels.append(1)  # foreground
+            log.info(f"SAM fg 포인트: Diff 기반 {len(fg_points)}개")
+        else:
+            # 기본: bbox 중앙 1개
+            cx, cy = x + w // 2, y + h // 2
+            coords.append([np.clip(cx, 0, fw - 1), np.clip(cy, 0, fh - 1)])
+            labels.append(1)
+
+        # 외곽 bg 포인트
+        cx_bg, cy_bg = x + w // 2, y + h // 2
         m = 20
         for bxp, byp in [
-            (cx, max(0, y - m)),
-            (cx, min(fh - 1, y + h + m)),
-            (max(0, x - m), cy),
-            (min(fw - 1, x + w + m), cy),
+            (cx_bg, max(0, y - m)),
+            (cx_bg, min(fh - 1, y + h + m)),
+            (max(0, x - m), cy_bg),
+            (min(fw - 1, x + w + m), cy_bg),
         ]:
             coords.append([bxp, byp])
             labels.append(0)  # background
@@ -825,99 +925,117 @@ def extract_shadow_map(f1, f2, mask):
              f"검증된 그림자: {np.sum(valid_shadow > 0)}px)")
     return shadow_map
 
-def _diff_bbox(first_frame, generated_frame):
+def _semantic_diff_analyze(first_frame, generated_frame, keyword):
     """
-    first_frame과 generated_frame의 픽셀 차이로 추가된 객체의 bbox를 추출한다.
-    마스크가 아닌 bbox만 반환 (정밀 마스크는 SAM에 위임).
-    
-    반환: (x, y, w, h) 또는 None
+    단순 전역 픽셀 비교가 아닌 의미론적(Semantic) 비교를 수행한다.
+    1. DINO를 사용하여 합성 이미지에서 객체 후보(BBox)들을 찾는다.
+    2. 각 후보 BBox 내부에서만 원본 대비 픽셀 변화량을 측정한다.
+    3. 전역 조명 변화/배경 노이즈를 무시하고 실질적으로 '새롭게 등장한' 객체를 확정한다.
     """
     h1, w1 = first_frame.shape[:2]
     h2, w2 = generated_frame.shape[:2]
     if (h1, w1) != (h2, w2):
-        first_resized = cv2.resize(first_frame, (w2, h2), interpolation=cv2.INTER_AREA)
+        f1_align = cv2.resize(first_frame, (w2, h2), interpolation=cv2.INTER_AREA)
     else:
-        first_resized = first_frame
+        f1_align = first_frame
 
-    # Lab 색 공간 차이
-    lab1 = cv2.cvtColor(first_resized, cv2.COLOR_BGR2Lab).astype(np.float32)
-    lab2 = cv2.cvtColor(generated_frame, cv2.COLOR_BGR2Lab).astype(np.float32)
-    diff = np.sqrt(np.sum((lab1 - lab2) ** 2, axis=2))
-
-    # 높은 임계값 → 확실한 변화만 포착 (배경 노이즈 배제)
-    p99 = np.percentile(diff, 99)
-    p50 = np.percentile(diff, 50)
-    threshold = max(p50 + (p99 - p50) * 0.4, 20.0)
-
-    binary = (diff > threshold).astype(np.uint8) * 255
-
-    # 강한 노이즈 제거
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
-    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=2)
-    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel, iterations=2)
-
-    # 최대 연결 컴포넌트
-    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary, 8)
-    if num_labels <= 1:
+    log.info(f"의미론적 객체 탐색: '{keyword}' 후보 찾는 중...")
+    try:
+        bboxes = _dino_detect(generated_frame, keyword)
+    except Exception as e:
+        log.warning(f"DINO가 합성 프레임에서 '{keyword}' 탐지 실패: {e}")
         return None
 
-    areas = stats[1:, cv2.CC_STAT_AREA]
-    largest_label = np.argmax(areas) + 1
-    obj_area = stats[largest_label, cv2.CC_STAT_AREA]
-
-    total_pixels = h2 * w2
-    if obj_area < total_pixels * 0.005:
-        log.info(f"Diff: 변화 영역 너무 작음 ({obj_area}px)")
+    if not bboxes:
         return None
 
-    # bbox + 여유 패딩
-    bx = stats[largest_label, cv2.CC_STAT_LEFT]
-    by = stats[largest_label, cv2.CC_STAT_TOP]
-    bw = stats[largest_label, cv2.CC_STAT_WIDTH]
-    bh = stats[largest_label, cv2.CC_STAT_HEIGHT]
+    # 미세 노이즈 무시를 위해 약간의 블러 적용 후 Lab 색 공간 비교
+    blur1 = cv2.GaussianBlur(f1_align, (11, 11), 0)
+    blur2 = cv2.GaussianBlur(generated_frame, (11, 11), 0)
+    lab1 = cv2.cvtColor(blur1, cv2.COLOR_BGR2Lab).astype(np.float32)
+    lab2 = cv2.cvtColor(blur2, cv2.COLOR_BGR2Lab).astype(np.float32)
+    diff_map = np.sqrt(np.sum((lab1 - lab2) ** 2, axis=2))
 
-    pad = int(max(bw, bh) * 0.1)
-    bx = max(0, bx - pad)
-    by = max(0, by - pad)
-    bw = min(bw + 2 * pad, w2 - bx)
-    bh = min(bh + 2 * pad, h2 - by)
+    best_score = -1
+    best_bbox = None
+    best_fg_points = []
+    
+    for i, bb in enumerate(bboxes):
+        x, y, w, h = bb
+        roi_diff = diff_map[y:y+h, x:x+w]
+        if roi_diff.size == 0:
+            continue
+            
+        # 해당 BBox 내에서 픽셀 변화가 가장 큰 상위 30% 영역의 평균 변화량 계산
+        flat_diff = np.sort(roi_diff.flatten())[::-1]
+        top_k = max(1, len(flat_diff) // 3)
+        mean_diff = flat_diff[:top_k].mean()
+        
+        # 작은 노이즈가 높은 평균을 가지는 것을 막기 위해 면적 가중치 추가
+        score = mean_diff * np.sqrt(w * h)
+        log.info(f"후보 {i+1} {bb} - 상위 변화율: {mean_diff:.1f}, 스코어: {score:.0f}")
+        
+        if score > best_score:
+            best_score = score
+            best_bbox = bb
+            
+            # Foreground 힌트 포인트 추출 (가장 뚜렷하게 변한 픽셀들)
+            hot_threshold = np.percentile(roi_diff, 85)
+            ys, xs = np.where(roi_diff >= hot_threshold)
+            fg = []
+            if len(xs) > 0:
+                p_count = min(5, len(xs))
+                indices = np.linspace(0, len(xs)-1, p_count, dtype=int)
+                for idx in indices:
+                    fg.append((int(x + xs[idx]), int(y + ys[idx])))
+            
+            # 중앙점 하나를 확실하게 추가
+            cx, cy = x + w // 2, y + h // 2
+            if fg:
+                fg[0] = (cx, cy)
+            else:
+                fg.append((cx, cy))
+            best_fg_points = fg
 
-    log.info(f"Diff bbox ✅: 영역={obj_area}px ({obj_area/total_pixels*100:.1f}%), "
-             f"bbox=({bx},{by},{bw},{bh}), threshold={threshold:.1f}")
-    return (bx, by, bw, bh)
+    # 원본 대비 유의미한 변화가 없다면(기존 배경의 객체를 잡았다면) 무시
+    if best_score < 50:
+        log.warning("감지된 객체들이 원본과 너무 동일합니다 (유의미한 추가 객체 아님).")
+        return None
+
+    log.info(f"선택 완료! 새로운 객체: BBox={best_bbox}, fg_points={len(best_fg_points)}개")
+    return best_bbox, best_fg_points
 
 
 def step4_extract(first_frame, generated_frame, keyword):
     """
-    추가된 객체 추출. 하이브리드 전략:
-      1) Diff로 대략적 bbox 찾기 (기둥 등 DINO가 놓치는 부분 포함)
-      2) SAM으로 정밀 마스크 추출 (건물 노이즈 제거)
-      폴백: Diff 실패 시 DINO bbox → SAM
+    추가된 객체 추출.
+    DINO를 이용해 의미론적 후보를 찾은 뒤, 원본과 변화량이 가장 큰 객체를 추출.
     """
     fh, fw = generated_frame.shape[:2]
 
-    # ── Diff로 bbox 탐색 ──
-    log.info("객체 추출: Diff로 변경 영역 탐색...")
-    diff_bbox = _diff_bbox(first_frame, generated_frame)
+    log.info("객체 추출: 의미론적 객체 비교(Semantic Diff) 진행 중...")
+    diff_result = _semantic_diff_analyze(first_frame, generated_frame, keyword)
 
-    if diff_bbox is not None:
-        # ── Diff bbox → SAM 정밀 세그멘테이션 ──
-        log.info(f"Diff bbox 발견 → SAM으로 정밀 마스크 추출...")
-        combined_mask = _sam_segment(generated_frame, diff_bbox)
+    combined_mask = np.zeros((fh, fw), dtype=np.uint8)
+
+    if diff_result is not None:
+        diff_bbox, fg_points = diff_result
+        log.info(f"의미론적 추가 객체 발견 → SAM에 힌트 포인트 전달...")
+        combined_mask = _sam_segment(generated_frame, diff_bbox, fg_points=fg_points)
         combined_mask = _refine_mask(combined_mask, generated_frame, diff_bbox)
-        log.info("Diff + SAM 하이브리드 추출 완료")
     else:
-        # ── 폴백: DINO + SAM ──
-        log.info("Diff 탐색 불충분 — DINO + SAM 폴백...")
-        all_bboxes = _dino_detect(generated_frame, keyword)
-
-        combined_mask = np.zeros((fh, fw), dtype=np.uint8)
-        for i, bb in enumerate(all_bboxes):
-            log.info(f"SAM 세그멘테이션 [{i+1}/{len(all_bboxes)}]: bbox={bb}")
-            mask_i = _sam_segment(generated_frame, bb)
-            mask_i = _refine_mask(mask_i, generated_frame, bb)
-            combined_mask = cv2.bitwise_or(combined_mask, mask_i)
-        log.info(f"마스크 결합 완료: {len(all_bboxes)}개 객체")
+        log.warning("의미론적 객체 비교 실패 — DINO 전체 객체 SAM 폴백 진행...")
+        try:
+            all_bboxes = _dino_detect(generated_frame, keyword)
+            for i, bb in enumerate(all_bboxes):
+                log.info(f"SAM 세그멘테이션 [{i+1}/{len(all_bboxes)}]: bbox={bb}")
+                mask_i = _sam_segment(generated_frame, bb)
+                mask_i = _refine_mask(mask_i, generated_frame, bb)
+                combined_mask = cv2.bitwise_or(combined_mask, mask_i)
+            log.info(f"마스크 결합 완료: {len(all_bboxes)}개 객체")
+        except Exception as e:
+            log.error(f"폴백 DINO 탐지마저 실패했습니다: {e}")
+            raise RuntimeError("객체를 추출할 수 없습니다.")
 
     # 그림자 추출
     eroded_mask = cv2.erode(combined_mask, np.ones((5, 5), np.uint8), iterations=1)
@@ -1149,9 +1267,9 @@ def main():
     print("=" * 55)
 
 
-def _call_gemini_once(first_pil, obj_pil, kw, w1, h1, user_prompt=""):
+def _call_gemini_once(first_pil, obj_pil, kw, w1, h1, user_prompt="", quality_desc=""):
     """Gemini API를 1회 호출하여 합성 이미지(cv2 ndarray)를 반환한다."""
-    gemini_prompt = _build_gemini_prompt(kw, w1, h1, user_prompt)
+    gemini_prompt = _build_gemini_prompt(kw, w1, h1, user_prompt, quality_desc)
 
     for attempt in range(5):
         log.info(f"Gemini API (시도 {attempt+1}/5)...")
@@ -1221,13 +1339,14 @@ def generate_previews(video_path, obj_img_path, user_prompt, count=3, on_progres
     h1, w1 = f1.shape[:2]
     first_pil = _cv2_to_pil(f1, max_side=1280)
     obj_pil = _load_obj_as_pil(obj_img_path, max_side=512)
+    quality_desc = _analyze_frame_for_prompt(f1)
 
     preview_paths = []
     for i in range(count):
         pct = int(10 + (80 * i / count))
         _p("GEMINI", pct, f"Gemini 모델이 프리뷰 이미지를 생성하는 중입니다... ({i+1}/{count})")
 
-        img = _call_gemini_once(first_pil, obj_pil, kw, w1, h1, user_prompt)
+        img = _call_gemini_once(first_pil, obj_pil, kw, w1, h1, user_prompt, quality_desc)
         path = os.path.join(OUTPUTS, f"preview_{i}.png")
         cv2.imwrite(path, img)
         preview_paths.append(path)
