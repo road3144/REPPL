@@ -26,6 +26,35 @@ const stageLabel: Record<SubmitStage, string> = {
   'creating-job': '작업 생성 중...',
 };
 
+function VideoFileIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="3" y="5" width="13" height="14" rx="2" />
+      <path d="m16 10 5-3v10l-5-3z" />
+    </svg>
+  );
+}
+
+function ImageFileIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="9" cy="10" r="1.5" />
+      <path d="m21 15-4.5-4.5L8 19" />
+    </svg>
+  );
+}
+
+function UploadTrayIcon({ className = 'w-7 h-7' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 15V4" />
+      <path d="m8 8 4-4 4 4" />
+      <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+    </svg>
+  );
+}
+
 export function JobCreateForm({ onCreated, onError, onUploaded, className }: JobCreateFormProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [refImageFile, setRefImageFile] = useState<File | null>(null);
@@ -147,12 +176,7 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
 
   return (
     <form onSubmit={handleSubmit} className={className ?? 'light-slide-card'}>
-      <h2 className="text-2xl font-black text-slate-900">새 삽입 작업</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-500">
-        동영상과 물체 사진을 업로드하고 배치 위치를 설명하세요.
-      </p>
-
-      <div className="mt-6 space-y-5">
+      <div className="space-y-5">
         {/* ── 1. Video Upload ── */}
         <div>
           <p className="form-label">① 원본 영상 파일</p>
@@ -172,7 +196,9 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
             />
             {videoFile ? (
               <div className="drop-zone-info">
-                <span className="drop-zone-icon">🎬</span>
+                <span className="drop-zone-icon" aria-hidden="true">
+                  <VideoFileIcon />
+                </span>
                 <div>
                   <p className="text-sm font-bold text-slate-800">{videoFile.name}</p>
                   <p className="text-xs text-slate-500">{(videoFile.size / 1024 / 1024).toFixed(1)} MB</p>
@@ -187,7 +213,9 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
               </div>
             ) : (
               <div className="drop-zone-placeholder">
-                <span className="drop-zone-icon-large">📁</span>
+                <span className="drop-zone-icon-large" aria-hidden="true">
+                  <UploadTrayIcon />
+                </span>
                 <p className="text-sm font-semibold text-slate-600">클릭 또는 드래그하여 mp4 파일 업로드</p>
                 <p className="text-xs text-slate-400 mt-1">최대 1개 파일</p>
               </div>
@@ -229,7 +257,9 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
               </div>
             ) : (
               <div className="drop-zone-placeholder">
-                <span className="drop-zone-icon-large">🖼️</span>
+                <span className="drop-zone-icon-large" aria-hidden="true">
+                  <ImageFileIcon className="w-7 h-7" />
+                </span>
                 <p className="text-sm font-semibold text-slate-600">클릭 또는 드래그하여 이미지 업로드</p>
                 <p className="text-xs text-slate-400 mt-1">png, jpg, jpeg (1개)</p>
               </div>

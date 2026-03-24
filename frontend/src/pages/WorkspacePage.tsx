@@ -16,6 +16,35 @@ const STATUS_CFG: Record<string, { label: string; badgeCls: string; progressCls:
 
 type Tab = 'all' | 'running' | 'waiting' | 'done';
 
+function FileStackIcon({ className = 'w-7 h-7' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M8 3h8l4 4v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+      <path d="M16 3v5h5" />
+      <path d="M10 12h4" />
+      <path d="M10 16h4" />
+    </svg>
+  );
+}
+
+function CheckCircleIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8.5 12 2.3 2.3 4.7-4.8" />
+    </svg>
+  );
+}
+
+function VideoPanelIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="3" y="6" width="13" height="12" rx="2" />
+      <path d="m16 10 5-3v10l-5-3z" />
+    </svg>
+  );
+}
+
 export function WorkspacePage() {
   const {
     jobs, loadingJobs, errorMessage, setErrorMessage,
@@ -61,8 +90,14 @@ export function WorkspacePage() {
       }}>
         <div style={{ padding: '20px 24px 14px', borderBottom: '1px solid #f0f0f5' }}>
           <Link to="/" style={{ textDecoration: 'none', display: 'inline-block', marginBottom: 18 }}>
-            <span className="nav-logo">
-              <span>Re:PPL</span>
+            <span style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: 24,
+              fontWeight: 900,
+              letterSpacing: '-0.5px',
+              color: '#111',
+            }}>
+              Re:<span style={{ color: '#4a6cf7' }}>PPL</span>
             </span>
           </Link>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: '#111', margin: 0 }}>새 작업 만들기</h2>
@@ -133,7 +168,9 @@ export function WorkspacePage() {
           )}
           {!loadingJobs && filteredJobs.length === 0 && (
             <div className="empty-state">
-              <span className="empty-state-icon">📋</span>
+              <span className="empty-state-icon" aria-hidden="true">
+                <FileStackIcon />
+              </span>
               <p style={{ fontSize: 14, fontWeight: 600, color: '#64748b' }}>작업이 없습니다</p>
               <p style={{ fontSize: 12, color: '#94a3b8' }}>왼쪽에서 새 작업을 만들어보세요</p>
             </div>
@@ -179,8 +216,10 @@ export function WorkspacePage() {
           <div style={{
             width: 38, height: 38, borderRadius: 10, background: '#4a6cf7',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, fontSize: 18,
-          }}>🎉</div>
+            flexShrink: 0, color: '#fff',
+          }}>
+            <CheckCircleIcon />
+          </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 700 }}>합성이 완료되었습니다!</div>
@@ -216,8 +255,10 @@ function JobCard({ job, onDownload, onSelectPreview }: {
       <div style={{
         width: 80, height: 52, borderRadius: 8,
         background: 'linear-gradient(135deg, #1a1a2e, #0d0d1a)',
-        flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
-      }}>🎬</div>
+        flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.92)',
+      }}>
+        <VideoPanelIcon />
+      </div>
 
       {/* Info */}
       <div style={{ flex: 1, minWidth: 0 }}>
