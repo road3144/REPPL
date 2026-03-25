@@ -34,6 +34,92 @@ const STATUS_TAB_ITEMS: Array<{ id: Tab; label: string }> = [
   { id: 'done', label: '완료' },
 ];
 
+const GUIDE_QUICK_STEPS = [
+  {
+    title: '원본 영상 업로드',
+    description: '프레임이 흔들리지 않고 제품이 놓일 공간이 충분한 영상을 선택하세요.',
+  },
+  {
+    title: '제품 이미지 등록',
+    description: '배경이 깔끔한 PNG/JPG를 최대 5장까지 업로드해 다양한 후보를 만드세요.',
+  },
+  {
+    title: '배치 프롬프트 작성',
+    description: '위치·크기·각도를 구체적으로 작성하면 검증 실패와 재작업을 줄일 수 있습니다.',
+  },
+  {
+    title: '프리뷰 선택 후 합성',
+    description: '프리뷰 4개 중 가장 자연스러운 결과를 선택한 뒤 최종 합성을 실행하세요.',
+  },
+] as const;
+
+const GUIDE_PROMPT_DO = [
+  '“테이블 오른쪽 컵 옆에 제품을 30도 각도로 배치”처럼 위치 기준점을 명확히 작성',
+  '“원근감 유지, 그림자 자연스럽게”처럼 품질 요구사항을 한 줄로 덧붙이기',
+  '제품이 가려지면 안 되는 오브젝트가 있다면 반드시 함께 지정하기',
+] as const;
+
+const GUIDE_PROMPT_DONT = [
+  '“아무데나 자연스럽게”처럼 모호한 지시어만 단독으로 사용',
+  '한 문장에 서로 충돌하는 지시를 동시에 작성',
+  '“정중앙” 지시 후 가장자리 오브젝트와 충돌 가능한 장면을 그대로 사용',
+] as const;
+
+const GUIDE_STATUS_ITEMS = [
+  {
+    status: '대기 중',
+    detail: '요청이 접수되어 순서를 기다리는 상태입니다.',
+  },
+  {
+    status: '처리 중',
+    detail: '추적/마스킹/합성 단계가 순차적으로 실행 중입니다.',
+  },
+  {
+    status: '완료',
+    detail: '결과 영상 다운로드 또는 재생이 가능합니다.',
+  },
+  {
+    status: '실패',
+    detail: '프롬프트 검증 실패나 입력 파일 품질 문제일 수 있습니다. 가이드 예시를 참고해 수정하세요.',
+  },
+] as const;
+
+const GUIDE_FAQ_ITEMS = [
+  {
+    question: '작업이 오래 걸릴 때 먼저 확인할 것은 무엇인가요?',
+    answer:
+      '작업 내역에서 상태가 “대기 중”인지 “처리 중”인지 확인하세요. 대기 중이면 순차 처리 대기이며, 처리 중에서 오래 멈춘 경우 원본 영상 용량과 해상도를 먼저 점검하세요.',
+  },
+  {
+    question: '프롬프트 검증 실패를 줄이려면 어떻게 작성해야 하나요?',
+    answer:
+      '공간 기준점(예: 책상 오른쪽 모서리), 배치 방식(예: 세워서/눕혀서), 품질 조건(예: 그림자 유지)을 함께 적으면 실패율이 크게 줄어듭니다.',
+  },
+  {
+    question: '결과물이 어색할 때는 어떤 순서로 재시도하면 좋나요?',
+    answer:
+      '1) 제품 이미지 배경 정리 2) 프롬프트 위치 표현 구체화 3) 프리뷰 후보 중 다른 컷 선택 순서로 재시도하는 것을 권장합니다.',
+  },
+] as const;
+
+const GUIDE_REFERENCE_IMAGES = [
+  {
+    title: '파이프라인 흐름',
+    description: '요청부터 최종 출력까지 단계 구조',
+    src: '/images/process_flow.png',
+  },
+  {
+    title: '전/후 비교 예시',
+    description: '합성 결과 품질 체크 기준',
+    src: '/images/before_after_demo.png',
+  },
+  {
+    title: '결과물 활용 예시',
+    description: '숏폼 배포 화면 예시',
+    src: '/images/shorts_mockup.png',
+  },
+] as const;
+
 function filterJobsByTab(jobs: JobItem[], tab: Tab): JobItem[] {
   if (tab === 'running') return jobs.filter((job) => job.status === 'RUNNING');
   if (tab === 'waiting') return jobs.filter((job) => job.status === 'QUEUED');
@@ -168,10 +254,11 @@ function WorkspaceTopBar({ activeSection, onCreateJob }: {
   );
 }
 
-function WorkspaceSidebar({ activeSection, onSelect, onCreateJob, counts }: {
+function WorkspaceSidebar({ activeSection, onSelect, onCreateJob, onOpenHelp, counts }: {
   activeSection: WorkspaceSection;
   onSelect: (next: WorkspaceSection) => void;
   onCreateJob: () => void;
+  onOpenHelp: () => void;
   counts: Record<WorkspaceSection, number>;
 }) {
   return (
@@ -216,12 +303,122 @@ function WorkspaceSidebar({ activeSection, onSelect, onCreateJob, counts }: {
           <SidebarGearIcon />
           <span>설정</span>
         </button>
-        <button type="button" className="workspace-sidebar-subitem">
+        <button type="button" className="workspace-sidebar-subitem" onClick={onOpenHelp}>
           <SidebarHelpIcon />
           <span>도움말</span>
         </button>
       </div>
     </aside>
+  );
+}
+
+function WorkspaceGuideModal({ onClose }: { onClose: () => void }) {
+  return (
+    <>
+      <div className="workspace-guide-modal-backdrop" onClick={onClose} />
+      <section
+        className="workspace-guide-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="workspace-guide-title"
+      >
+        <div className="workspace-guide-modal-header">
+          <div>
+            <h2 id="workspace-guide-title">서비스 가이드라인</h2>
+            <p>초기 온보딩부터 작업 품질 개선까지, 팀 공통 기준으로 바로 사용할 수 있습니다.</p>
+          </div>
+          <button type="button" className="workspace-guide-close-btn" onClick={onClose} aria-label="가이드 닫기">
+            ×
+          </button>
+        </div>
+
+        <div className="workspace-guide-modal-body">
+          <section className="workspace-guide-hero">
+            <strong>권장 운영 원칙</strong>
+            <p>프롬프트를 먼저 구체화하고 프리뷰를 확인한 뒤 합성하면 재작업 시간을 크게 줄일 수 있습니다.</p>
+            <div className="workspace-guide-badge-row">
+              <span className="workspace-guide-badge">정확한 위치 지시</span>
+              <span className="workspace-guide-badge">프리뷰 기반 선택</span>
+              <span className="workspace-guide-badge">완료 토스트 실시간 확인</span>
+            </div>
+          </section>
+
+          <section className="workspace-guide-section">
+            <h3>빠른 시작</h3>
+            <div className="workspace-guide-step-grid">
+              {GUIDE_QUICK_STEPS.map((step, index) => (
+                <article key={step.title} className="workspace-guide-step-card">
+                  <span className="workspace-guide-step-index">STEP {index + 1}</span>
+                  <h4>{step.title}</h4>
+                  <p>{step.description}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="workspace-guide-section">
+            <h3>프롬프트 작성 기준</h3>
+            <div className="workspace-guide-rule-grid">
+              <article className="workspace-guide-rule-card good">
+                <h4>이렇게 작성하세요</h4>
+                <ul>
+                  {GUIDE_PROMPT_DO.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </article>
+              <article className="workspace-guide-rule-card bad">
+                <h4>이 표현은 피하세요</h4>
+                <ul>
+                  {GUIDE_PROMPT_DONT.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <section className="workspace-guide-section">
+            <h3>작업 상태 이해</h3>
+            <div className="workspace-guide-status-grid">
+              {GUIDE_STATUS_ITEMS.map((item) => (
+                <article key={item.status} className="workspace-guide-status-card">
+                  <strong>{item.status}</strong>
+                  <p>{item.detail}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="workspace-guide-section">
+            <h3>자주 묻는 질문</h3>
+            <div className="workspace-guide-faq-list">
+              {GUIDE_FAQ_ITEMS.map((item) => (
+                <details key={item.question} className="workspace-guide-faq-item">
+                  <summary>{item.question}</summary>
+                  <p>{item.answer}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+
+          {/* <section className="workspace-guide-section">
+            <h3>시각 참고 자료</h3>
+            <div className="workspace-guide-image-grid">
+              {GUIDE_REFERENCE_IMAGES.map((item) => (
+                <figure key={item.src} className="workspace-guide-image-card">
+                  <img src={item.src} alt={item.title} loading="lazy" />
+                  <figcaption>
+                    <strong>{item.title}</strong>
+                    <span>{item.description}</span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </section> */}
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -401,9 +598,9 @@ function WorkspaceResultsView({
             key={job.jobId}
             job={job}
             selected={false}
-            onSelect={() => {}}
+            onSelect={() => { }}
             onDownload={onDownload}
-            onSelectPreview={() => {}}
+            onSelectPreview={() => { }}
           />
         ))}
       </div>
@@ -461,7 +658,7 @@ function WorkspaceHistoryView({
             key={job.jobId}
             job={job}
             selected={false}
-            onSelect={() => {}}
+            onSelect={() => { }}
             onDownload={onDownload}
             onSelectPreview={onSelectPreview}
           />
@@ -492,6 +689,7 @@ export function WorkspacePage() {
   const [historyTab, setHistoryTab] = useState<Tab>('all');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [guideModalOpen, setGuideModalOpen] = useState(false);
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
   const [promptError, setPromptError] = useState<string | null>(null);
   const prevJobsRef = useRef<JobItem[]>([]);
@@ -566,6 +764,21 @@ export function WorkspacePage() {
     setErrorMessage(null);
   };
 
+  useEffect(() => {
+    if (!guideModalOpen) {
+      return undefined;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setGuideModalOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [guideModalOpen]);
+
   return (
     <div className="workspace-shell">
       <WorkspaceTopBar activeSection={activeSection} onCreateJob={openCreateModal} />
@@ -575,6 +788,7 @@ export function WorkspacePage() {
           activeSection={activeSection}
           onSelect={setActiveSection}
           onCreateJob={openCreateModal}
+          onOpenHelp={() => setGuideModalOpen(true)}
           counts={sidebarCounts}
         />
 
@@ -636,6 +850,8 @@ export function WorkspacePage() {
           </div>
         </>
       )}
+
+      {guideModalOpen && <WorkspaceGuideModal onClose={() => setGuideModalOpen(false)} />}
 
       {playbackUrl && (
         <>
