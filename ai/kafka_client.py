@@ -33,6 +33,14 @@ class KafkaJobConsumer:
             f"group={KAFKA_CONSUMER_GROUP_ID}, servers={KAFKA_BOOTSTRAP_SERVERS}"
         )
 
+    def flush_pending(self):
+        """시작 시 밀린 메시지를 건너뛰고 최신 offset으로 이동한다."""
+        self._consumer.poll(timeout_ms=5000)
+        for tp in self._consumer.assignment():
+            self._consumer.seek_to_end(tp)
+        self._consumer.commit()
+        log.info("밀린 메시지 스킵 — 최신 offset으로 이동 완료")
+
     def poll(self):
         """메시지를 (topic, value) 튜플로 yield 한다."""
         for message in self._consumer:
