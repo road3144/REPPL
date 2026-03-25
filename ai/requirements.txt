@@ -48,3 +48,4 @@ yapf==0.43.0
 google-genai
 boto3
 kafka-python
+imageio-ffmpeg

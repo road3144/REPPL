@@ -182,14 +182,21 @@ export function useJobs() {
   };
 
   const downloadResult = async (jobId: string) => {
-    const result = await getJobResult(jobId);
-    const a = document.createElement('a');
-    a.href = result.download.url;
-    a.download = `${jobId}.mp4`;
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+      const result = await getJobResult(jobId);
+      const resp = await fetch(result.download.url);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `${jobId}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      setErrorMessage('다운로드에 실패했습니다.');
+    }
   };
 
   const getPlaybackUrl = async (jobId: string): Promise<string> => {
