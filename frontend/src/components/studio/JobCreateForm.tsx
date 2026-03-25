@@ -197,27 +197,28 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
               className="hidden"
             />
             {videoFile ? (
-              <div style={{ width: '100%' }}>
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {videoPreview && (
                   <video
                     src={videoPreview}
                     controls
                     muted
-                    style={{ width: '100%', borderRadius: 8, maxHeight: 180, background: '#000', marginBottom: 8 }}
+                    style={{ width: '100%', borderRadius: 8, maxHeight: 160, objectFit: 'contain', background: '#000' }}
                     onClick={(e) => e.stopPropagation()}
                   />
                 )}
-                <div className="drop-zone-info">
-                  <span className="drop-zone-icon" aria-hidden="true">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="drop-zone-icon" aria-hidden="true" style={{ flexShrink: 0 }}>
                     <VideoFileIcon />
                   </span>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">{videoFile.name}</p>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p className="text-sm font-bold text-slate-800" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{videoFile.name}</p>
                     <p className="text-xs text-slate-500">{(videoFile.size / 1024 / 1024).toFixed(1)} MB</p>
                   </div>
                   <button
                     type="button"
-                    className="ml-auto text-xs font-semibold text-rose-500 hover:text-rose-700 transition"
+                    className="text-xs font-semibold text-rose-500 hover:text-rose-700 transition"
+                    style={{ flexShrink: 0 }}
                     onClick={(e) => { e.stopPropagation(); handleVideoSelect(null); if (videoInputRef.current) videoInputRef.current.value = ''; }}
                   >
                     삭제

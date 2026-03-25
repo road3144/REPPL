@@ -657,6 +657,8 @@ h6 {
   border-style: solid;
   border-color: rgba(14, 165, 233, 0.18);
   background: rgba(240, 249, 255, 0.92);
+  height: auto;
+  min-height: 110px;
 }
 
 .drop-zone-placeholder {
