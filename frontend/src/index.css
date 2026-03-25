@@ -1095,6 +1095,314 @@ h6 {
   cursor: pointer;
 }
 
+.workspace-guide-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.58);
+  z-index: 270;
+}
+
+.workspace-guide-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(1020px, 94vw);
+  max-height: 90vh;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: #fff;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.35);
+  z-index: 271;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-guide-modal-header {
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid #e5e7ef;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.workspace-guide-modal-header h2 {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.workspace-guide-modal-header p {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.workspace-guide-close-btn {
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.workspace-guide-close-btn:hover {
+  color: #64748b;
+}
+
+.workspace-guide-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  background: #f7f8fc;
+  padding: 1rem 1.2rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.workspace-guide-hero {
+  border-radius: 0.9rem;
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  background: linear-gradient(145deg, rgba(238, 242, 255, 0.95), rgba(245, 247, 255, 0.95));
+  padding: 0.95rem 1rem;
+}
+
+.workspace-guide-hero strong {
+  display: block;
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #3f5ce6;
+  margin-bottom: 0.22rem;
+}
+
+.workspace-guide-hero p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #475569;
+  line-height: 1.55;
+}
+
+.workspace-guide-badge-row {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.36rem;
+}
+
+.workspace-guide-badge {
+  border-radius: 9999px;
+  border: 1px solid rgba(74, 108, 247, 0.2);
+  background: rgba(255, 255, 255, 0.75);
+  color: #3f5ce6;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.25rem 0.58rem;
+}
+
+.workspace-guide-section {
+  border-radius: 0.9rem;
+  border: 1px solid rgba(229, 231, 239, 0.92);
+  background: #fff;
+  padding: 0.95rem 1rem;
+}
+
+.workspace-guide-section h3 {
+  margin: 0;
+  font-size: 0.93rem;
+  font-weight: 800;
+  color: #1f2937;
+}
+
+.workspace-guide-step-grid {
+  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.62rem;
+}
+
+.workspace-guide-step-card {
+  border-radius: 0.82rem;
+  border: 1px solid #e5e7ef;
+  background: #f9fafb;
+  padding: 0.72rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.workspace-guide-step-index {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #4a6cf7;
+  letter-spacing: 0.04em;
+}
+
+.workspace-guide-step-card h4 {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #111827;
+  font-weight: 800;
+}
+
+.workspace-guide-step-card p {
+  margin: 0;
+  font-size: 0.76rem;
+  color: #64748b;
+  line-height: 1.52;
+}
+
+.workspace-guide-rule-grid {
+  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.62rem;
+}
+
+.workspace-guide-rule-card {
+  border-radius: 0.82rem;
+  border: 1px solid #e5e7ef;
+  background: #fff;
+  padding: 0.72rem 0.75rem;
+}
+
+.workspace-guide-rule-card.good {
+  border-color: rgba(16, 185, 129, 0.24);
+  background: rgba(236, 253, 245, 0.58);
+}
+
+.workspace-guide-rule-card.bad {
+  border-color: rgba(239, 68, 68, 0.22);
+  background: rgba(254, 242, 242, 0.66);
+}
+
+.workspace-guide-rule-card h4 {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.workspace-guide-rule-card ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.34rem;
+}
+
+.workspace-guide-rule-card li {
+  font-size: 0.76rem;
+  color: #475569;
+  line-height: 1.48;
+}
+
+.workspace-guide-status-grid {
+  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.62rem;
+}
+
+.workspace-guide-status-card {
+  border-radius: 0.82rem;
+  border: 1px solid #e5e7ef;
+  background: #f8fafc;
+  padding: 0.7rem 0.74rem;
+}
+
+.workspace-guide-status-card strong {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #334155;
+}
+
+.workspace-guide-status-card p {
+  margin: 0.3rem 0 0;
+  font-size: 0.76rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.workspace-guide-faq-list {
+  margin-top: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.52rem;
+}
+
+.workspace-guide-faq-item {
+  border-radius: 0.8rem;
+  border: 1px solid #e5e7ef;
+  background: #fff;
+  padding: 0.64rem 0.72rem;
+}
+
+.workspace-guide-faq-item summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.workspace-guide-faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.workspace-guide-faq-item p {
+  margin: 0.42rem 0 0;
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.52;
+}
+
+.workspace-guide-image-grid {
+  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.62rem;
+}
+
+.workspace-guide-image-card {
+  margin: 0;
+  border-radius: 0.82rem;
+  border: 1px solid #e5e7ef;
+  background: #fff;
+  overflow: hidden;
+}
+
+.workspace-guide-image-card img {
+  width: 100%;
+  display: block;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  background: #e2e8f0;
+}
+
+.workspace-guide-image-card figcaption {
+  padding: 0.55rem 0.62rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.workspace-guide-image-card strong {
+  font-size: 0.77rem;
+  color: #1f2937;
+  font-weight: 800;
+}
+
+.workspace-guide-image-card span {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
 @media (max-width: 1024px) {
   .workspace-shell-body {
     flex-direction: column;
@@ -1126,6 +1434,20 @@ h6 {
   .workspace-topbar-breadcrumb-action {
     font-size: 0.88rem;
   }
+
+  .workspace-guide-modal {
+    width: min(920px, 95vw);
+  }
+
+  .workspace-guide-step-grid,
+  .workspace-guide-rule-grid,
+  .workspace-guide-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-guide-image-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 768px) {
@@ -1141,6 +1463,23 @@ h6 {
   .workspace-create-modal {
     width: 96vw;
     max-height: 90vh;
+  }
+
+  .workspace-guide-modal {
+    width: 96vw;
+    max-height: 92vh;
+  }
+
+  .workspace-guide-modal-header {
+    padding: 0.9rem 1rem;
+  }
+
+  .workspace-guide-modal-body {
+    padding: 0.85rem 1rem 1rem;
+  }
+
+  .workspace-guide-image-grid {
+    grid-template-columns: 1fr;
   }
 }
 
