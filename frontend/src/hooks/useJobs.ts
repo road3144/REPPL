@@ -186,6 +186,11 @@ export function useJobs() {
     window.open(result.download.url, '_blank', 'noopener,noreferrer');
   };
 
+  const getPlaybackUrl = async (jobId: string): Promise<string> => {
+    const result = await getJobResult(jobId);
+    return result.download.url;
+  };
+
   return {
     jobs,
     running,
@@ -194,6 +199,7 @@ export function useJobs() {
     setErrorMessage,
     prependCreatedJob,
     downloadResult,
+    getPlaybackUrl,
     // 프리뷰 관련
     previewSelecting,
     selectingIndex,
