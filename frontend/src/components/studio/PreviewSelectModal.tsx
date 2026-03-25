@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import type { PreviewItem } from '../../services/types';
 
 type PreviewSelectModalProps = {
@@ -62,7 +62,7 @@ export function PreviewSelectModal({ jobId, previews, selecting, onSelect, onClo
             {' '}— 원하는 프리뷰를 선택하면 최종 합성이 시작됩니다.
           </p>
 
-          <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className={`mt-5 grid grid-cols-1 gap-4 ${previews.length === 1 ? 'sm:grid-cols-1 max-w-sm mx-auto' : previews.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
             {previews.map((preview) => (
               <button
                 key={preview.index}
