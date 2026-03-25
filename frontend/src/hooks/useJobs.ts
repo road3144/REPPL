@@ -183,7 +183,13 @@ export function useJobs() {
 
   const downloadResult = async (jobId: string) => {
     const result = await getJobResult(jobId);
-    window.open(result.download.url, '_blank', 'noopener,noreferrer');
+    const a = document.createElement('a');
+    a.href = result.download.url;
+    a.download = `${jobId}.mp4`;
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const getPlaybackUrl = async (jobId: string): Promise<string> => {
