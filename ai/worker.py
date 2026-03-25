@@ -240,6 +240,9 @@ def run():
     """Kafka에서 프리뷰/합성 작업을 수신하여 순차 처리한다."""
     log.info("REPPL AI Worker 시작 (프리뷰 + 합성)")
     consumer = KafkaJobConsumer()
+    if os.environ.get("FLUSH_KAFKA") == "1":
+        consumer.flush_pending()
+        log.info("FLUSH_KAFKA=1 — 밀린 메시지 스킵 완료, 이후 새 작업만 처리")
     producer = KafkaProgressProducer()
 
     try:
