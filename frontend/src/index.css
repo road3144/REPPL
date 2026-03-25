@@ -779,6 +779,372 @@ h6 {
 }
 
 /* ═══════════════════════════════════════════
+   Workspace Shell
+   ═══════════════════════════════════════════ */
+.workspace-shell {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f3f4f8;
+}
+
+.workspace-shell-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.workspace-shell-content {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.workspace-topbar {
+  height: 62px;
+  border-bottom: 1px solid #e5e7ef;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  padding: 0 1rem;
+  flex-shrink: 0;
+}
+
+.workspace-topbar-logo {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  text-decoration: none;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.workspace-topbar-logo span {
+  color: #4a6cf7;
+}
+
+.workspace-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.workspace-topbar-separator {
+  width: 1px;
+  height: 22px;
+  background: #e5e7ef;
+  flex-shrink: 0;
+}
+
+.workspace-topbar-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.93rem;
+  color: #6b7280;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.workspace-topbar-breadcrumb strong {
+  color: #111827;
+  font-weight: 800;
+}
+
+.workspace-topbar-breadcrumb-action {
+  border: none;
+  background: none;
+  color: #111827;
+  font-size: 0.93rem;
+  font-weight: 800;
+  padding: 0;
+  cursor: pointer;
+}
+
+.workspace-topbar-breadcrumb-action:hover {
+  color: #4a6cf7;
+}
+
+.workspace-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.workspace-create-btn {
+  border: none;
+  border-radius: 9px;
+  background: #4a6cf7;
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.workspace-create-btn:hover {
+  background: #3f5ce6;
+}
+
+.workspace-icon-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e5e7ef;
+  border-radius: 9999px;
+  background: #fff;
+  color: #6b7280;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.workspace-icon-btn:hover {
+  border-color: #d1d5db;
+  color: #334155;
+}
+
+.workspace-sidebar {
+  width: 258px;
+  flex-shrink: 0;
+  border-right: 1px solid #e5e7ef;
+  background: #f7f7fa;
+  display: flex;
+  flex-direction: column;
+  padding: 0.95rem 0.82rem;
+  gap: 1.2rem;
+}
+
+.workspace-sidebar-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.workspace-sidebar-title {
+  margin: 0 0 0.2rem;
+  font-size: 0.78rem;
+  color: #9ca3af;
+  font-weight: 700;
+}
+
+.workspace-sidebar-create {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 0.3rem;
+}
+
+.workspace-sidebar-item,
+.workspace-sidebar-subitem {
+  width: 100%;
+  border: none;
+  border-radius: 0.75rem;
+  background: transparent;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.93rem;
+  font-weight: 700;
+  text-align: left;
+  padding: 0.62rem 0.62rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.workspace-sidebar-subitem {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.workspace-sidebar-item:hover,
+.workspace-sidebar-subitem:hover {
+  background: rgba(230, 232, 240, 0.8);
+}
+
+.workspace-sidebar-item.active {
+  background: #dfe4fb;
+  color: #3f5ce6;
+}
+
+.workspace-sidebar-count {
+  margin-left: auto;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #4a6cf7;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.workspace-sidebar-item:not(.active) .workspace-sidebar-count {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.workspace-studio-layout {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  background: #f3f4f8;
+}
+
+.workspace-studio-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-create-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 260;
+}
+
+.workspace-create-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, 92vw);
+  max-height: 86vh;
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.26);
+  z-index: 261;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-create-modal-header {
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid #e5e7ef;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.workspace-create-modal-header h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.workspace-create-modal-header p {
+  margin: 0.2rem 0 0;
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.workspace-create-modal-header button {
+  border: none;
+  background: none;
+  color: #9ca3af;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.workspace-create-modal-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.workspace-create-modal-error {
+  padding: 0.65rem 1rem;
+  border-top: 1px solid #fecaca;
+  background: #fff5f5;
+  color: #ef4444;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.workspace-create-modal-error span {
+  flex: 1;
+}
+
+.workspace-create-modal-error button {
+  border: none;
+  background: none;
+  color: #ef4444;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+@media (max-width: 1024px) {
+  .workspace-shell-body {
+    flex-direction: column;
+  }
+
+  .workspace-sidebar {
+    display: none;
+  }
+
+  .workspace-topbar {
+    height: auto;
+    padding: 0.7rem 0.9rem;
+    gap: 10px;
+  }
+
+  .workspace-topbar-breadcrumb {
+    font-size: 0.88rem;
+  }
+
+  .workspace-topbar-left {
+    min-width: 0;
+    gap: 0.55rem;
+  }
+
+  .workspace-topbar-actions {
+    margin-left: auto;
+  }
+
+  .workspace-topbar-breadcrumb-action {
+    font-size: 0.88rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .workspace-topbar-breadcrumb {
+    display: none;
+  }
+
+  .workspace-create-btn {
+    padding: 0.62rem 1.05rem;
+    font-size: 0.9rem;
+  }
+
+  .workspace-create-modal {
+    width: 96vw;
+    max-height: 90vh;
+  }
+}
+
+/* ═══════════════════════════════════════════
    Job Cards
    ═══════════════════════════════════════════ */
 .job-card {
@@ -1132,7 +1498,7 @@ h6 {
   opacity: 0.4;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 900px) {
   .workspace-right-content {
     flex-direction: column;
   }
