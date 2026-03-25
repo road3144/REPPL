@@ -25,7 +25,7 @@ class KafkaJobConsumer:
             bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS.split(","),
             group_id=KAFKA_CONSUMER_GROUP_ID,
             auto_offset_reset="latest",
-            enable_auto_commit=True,
+            enable_auto_commit=False,
             value_deserializer=lambda v: json.loads(v.decode("utf-8")),
         )
         log.info(
@@ -37,6 +37,7 @@ class KafkaJobConsumer:
         """메시지를 (topic, value) 튜플로 yield 한다."""
         for message in self._consumer:
             yield message.topic, message.value
+            self._consumer.commit()
 
     def close(self):
         self._consumer.close()
