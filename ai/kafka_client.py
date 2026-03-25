@@ -44,8 +44,8 @@ class KafkaJobConsumer:
     def poll(self):
         """메시지를 (topic, value) 튜플로 yield 한다."""
         for message in self._consumer:
-            yield message.topic, message.value
             self._consumer.commit()
+            yield message.topic, message.value
 
     def close(self):
         self._consumer.close()

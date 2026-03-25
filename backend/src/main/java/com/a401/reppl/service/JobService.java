@@ -33,7 +33,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -47,11 +46,12 @@ public class JobService {
     private final CompositeRequestProducer compositeRequestProducer;
     private final S3Service s3Service;
     private final ObjectMapper objectMapper;
+    private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
 
     @Value("${cloud.aws.s3.bucket}")
     private String s3Bucket;
 
-    private static final AtomicInteger JOB_COUNTER = new AtomicInteger(0);
+    private static final String JOB_COUNTER_KEY = "job:counter";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     public JobListResponse getJobs(String sessionId, int page, int size) {
@@ -322,7 +322,7 @@ public class JobService {
 
     private String generateJobId() {
         String date = LocalDate.now().format(DATE_FORMAT);
-        int counter = JOB_COUNTER.incrementAndGet();
+        Long counter = redisTemplate.opsForValue().increment(JOB_COUNTER_KEY);
         return String.format("job_%s_%06d", date, counter);
     }
 
