@@ -50,6 +50,7 @@ function UploadTrayIcon({ className = 'w-7 h-7' }: { className?: string }) {
 
 export function JobCreateForm({ onCreated, onError, onUploaded, className }: JobCreateFormProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [refImageFile, setRefImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [placementPrompt, setPlacementPrompt] = useState('');
@@ -69,8 +70,14 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
       onError('mp4 동영상 파일만 업로드 가능합니다.');
       return;
     }
+    if (videoPreview) URL.revokeObjectURL(videoPreview);
+    if (file) {
+      setVideoPreview(URL.createObjectURL(file));
+    } else {
+      setVideoPreview(null);
+    }
     setVideoFile(file);
-  }, [onError]);
+  }, [onError, videoPreview]);
 
   const handleImageSelect = useCallback((file: File | null) => {
     if (file && !file.type.startsWith('image/')) {
@@ -139,6 +146,7 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
         setVideoFile(null);
         setRefImageFile(null);
         setPlacementPrompt('');
+        if (videoPreview) { URL.revokeObjectURL(videoPreview); setVideoPreview(null); }
         if (imagePreview) { URL.revokeObjectURL(imagePreview); setImagePreview(null); }
         if (videoInputRef.current) videoInputRef.current.value = '';
         if (refImageInputRef.current) refImageInputRef.current.value = '';
@@ -157,6 +165,7 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
       setVideoFile(null);
       setRefImageFile(null);
       setPlacementPrompt('');
+      if (videoPreview) { URL.revokeObjectURL(videoPreview); setVideoPreview(null); }
       if (imagePreview) { URL.revokeObjectURL(imagePreview); setImagePreview(null); }
       if (videoInputRef.current) videoInputRef.current.value = '';
       if (refImageInputRef.current) refImageInputRef.current.value = '';
@@ -188,21 +197,32 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
               className="hidden"
             />
             {videoFile ? (
-              <div className="drop-zone-info">
-                <span className="drop-zone-icon" aria-hidden="true">
-                  <VideoFileIcon />
-                </span>
-                <div>
-                  <p className="text-sm font-bold text-slate-800">{videoFile.name}</p>
-                  <p className="text-xs text-slate-500">{(videoFile.size / 1024 / 1024).toFixed(1)} MB</p>
+              <div style={{ width: '100%' }}>
+                {videoPreview && (
+                  <video
+                    src={videoPreview}
+                    controls
+                    muted
+                    style={{ width: '100%', borderRadius: 8, maxHeight: 180, background: '#000', marginBottom: 8 }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                )}
+                <div className="drop-zone-info">
+                  <span className="drop-zone-icon" aria-hidden="true">
+                    <VideoFileIcon />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">{videoFile.name}</p>
+                    <p className="text-xs text-slate-500">{(videoFile.size / 1024 / 1024).toFixed(1)} MB</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="ml-auto text-xs font-semibold text-rose-500 hover:text-rose-700 transition"
+                    onClick={(e) => { e.stopPropagation(); handleVideoSelect(null); if (videoInputRef.current) videoInputRef.current.value = ''; }}
+                  >
+                    삭제
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="ml-auto text-xs font-semibold text-rose-500 hover:text-rose-700 transition"
-                  onClick={(e) => { e.stopPropagation(); setVideoFile(null); if (videoInputRef.current) videoInputRef.current.value = ''; }}
-                >
-                  삭제
-                </button>
               </div>
             ) : (
               <div className="drop-zone-placeholder">

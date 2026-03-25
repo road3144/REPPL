@@ -49,9 +49,21 @@ function VideoPanelIcon({ className = 'w-5 h-5' }: { className?: string }) {
 export function WorkspacePage() {
   const {
     jobs, loadingJobs, errorMessage, setErrorMessage,
-    prependCreatedJob, downloadResult,
+    prependCreatedJob, downloadResult, getPlaybackUrl,
     previewSelecting, selectingIndex, loadPreviews, handleSelectPreview, closePreviewSelection,
   } = useJobs();
+
+  /* ── Video player modal ── */
+  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
+
+  const openPlayer = async (jobId: string) => {
+    try {
+      const url = await getPlaybackUrl(jobId);
+      setPlaybackUrl(url);
+    } catch {
+      setErrorMessage('영상 재생 URL을 가져올 수 없습니다.');
+    }
+  };
 
   const [tab, setTab] = useState<Tab>('all');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -214,6 +226,7 @@ export function WorkspacePage() {
                 selected={job.jobId === selectedJobId}
                 onSelect={() => setSelectedJobId(job.jobId)}
                 onDownload={downloadResult}
+                onPlay={openPlayer}
                 onSelectPreview={loadPreviews}
               />
             ))}
@@ -225,6 +238,39 @@ export function WorkspacePage() {
           />
         </div>
       </div>
+
+      {/* ── VIDEO PLAYER MODAL ── */}
+      {playbackUrl && (
+        <>
+          <div
+            onClick={() => setPlaybackUrl(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 400 }}
+          />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            background: '#111', borderRadius: 16, zIndex: 401,
+            width: '80vw', maxWidth: 900, boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            animation: 'slideUpToast 0.2s ease', overflow: 'hidden',
+          }}>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '12px 16px', background: '#1a1a2e',
+            }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>영상 미리보기</span>
+              <button
+                onClick={() => setPlaybackUrl(null)}
+                style={{ background: 'none', border: 'none', color: '#aaa', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}
+              >×</button>
+            </div>
+            <video
+              src={playbackUrl}
+              controls
+              autoPlay
+              style={{ width: '100%', display: 'block', maxHeight: '70vh', background: '#000' }}
+            />
+          </div>
+        </>
+      )}
 
       {/* ── PROMPT ERROR MODAL ── */}
       {promptError && (
@@ -323,11 +369,12 @@ export function WorkspacePage() {
 }
 
 /* ── Job Card component ── */
-function JobCard({ job, selected, onSelect, onDownload, onSelectPreview }: {
+function JobCard({ job, selected, onSelect, onDownload, onPlay, onSelectPreview }: {
   job: JobItem;
   selected: boolean;
   onSelect: () => void;
   onDownload: (id: string) => Promise<void>;
+  onPlay: (id: string) => Promise<void>;
   onSelectPreview: (id: string) => void;
 }) {
   const cfg = STATUS_CFG[job.status] ?? STATUS_CFG['QUEUED'];
@@ -400,12 +447,20 @@ function JobCard({ job, selected, onSelect, onDownload, onSelectPreview }: {
           </button>
         )}
         {isCompositeCompleted && (
-          <button className="download-btn" onClick={(event) => { event.stopPropagation(); void onDownload(job.jobId); }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M12 5v14M5 12l7 7 7-7" />
-            </svg>
-            다운로드
-          </button>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button className="download-btn" onClick={(event) => { event.stopPropagation(); void onPlay(job.jobId); }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polygon points="6,3 20,12 6,21" />
+              </svg>
+              재생
+            </button>
+            <button className="download-btn" onClick={(event) => { event.stopPropagation(); void onDownload(job.jobId); }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 5v14M5 12l7 7 7-7" />
+              </svg>
+              다운로드
+            </button>
+          </div>
         )}
       </div>
     </div>
