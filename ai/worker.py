@@ -13,6 +13,7 @@ Kafka에서 프리뷰/합성 작업 요청을 수신하여 처리하고,
 
 import os
 import logging
+import subprocess
 import traceback
 
 from config import (
@@ -41,6 +42,31 @@ def _cleanup(*paths):
                 os.remove(p)
         except OSError:
             pass
+
+
+def _get_ffmpeg_path() -> str:
+    """imageio-ffmpeg에서 ffmpeg 바이너리 경로를 가져온다."""
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except ImportError:
+        return "ffmpeg"  # 시스템 ffmpeg 폴백
+
+
+def _reencode_for_web(input_path: str) -> str:
+    """mp4v 코덱 영상을 H.264 + faststart로 재인코딩한다."""
+    output_path = input_path.replace(".mp4", "_web.mp4")
+    ffmpeg = _get_ffmpeg_path()
+    cmd = [
+        ffmpeg, "-y", "-i", input_path,
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-movflags", "+faststart",
+        "-an",
+        output_path,
+    ]
+    log.info(f"ffmpeg 재인코딩: {input_path} → {output_path}")
+    subprocess.run(cmd, check=True, capture_output=True)
+    return output_path
 
 
 # ══════════════════════════════════════════════════════════
@@ -179,9 +205,13 @@ def process_composite(event: dict, producer: KafkaProgressProducer):
             on_progress=on_progress,
         )
 
+        # ── ENCODE (H.264 + faststart) ──
+        producer.send_progress(job_id, "RUNNING", "ENCODE", 88, "웹 재생용 인코딩 중...")
+        web_output = _reencode_for_web(output_local)
+
         # ── UPLOAD ──
         producer.send_progress(job_id, "RUNNING", "UPLOAD", 90, "결과를 업로드하는 중입니다...")
-        upload_file(output_local, output_bucket, output_key)
+        upload_file(web_output, output_bucket, output_key)
         producer.send_progress(job_id, "RUNNING", "UPLOAD", 95, "업로드 완료")
 
         # ── COMPLETED ──
@@ -199,7 +229,8 @@ def process_composite(event: dict, producer: KafkaProgressProducer):
         )
 
     finally:
-        _cleanup(video_local, preview_local, output_local)
+        web_path = output_local.replace(".mp4", "_web.mp4")
+        _cleanup(video_local, preview_local, output_local, web_path)
 
 
 # ══════════════════════════════════════════════════════════
