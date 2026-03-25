@@ -1,4 +1,4 @@
-"""
+﻿"""
 영상 이미지 합성 파이프라인 v3 + Gemini API 연동
 =================================================
 Grounding DINO + SAM 강제 파이프라인 + Gemini 3.1 Flash Image Preview (Nano Banana 2) API.
@@ -505,7 +505,7 @@ def _parse_rate_limit_error(error_msg):
 
     # 권장 대기시간 파싱
     m = re.search(r'retry in ([\d.]+)s', err, re.IGNORECASE)
-    retry_sec = float(m.group(1)) + 2 if m else 50  # 여유 2초
+    retry_sec = float(m.group(1)) + 2 if m else 10  # 여유 2초
 
     return is_daily, retry_sec
 
@@ -1317,14 +1317,19 @@ def generate_previews(video_path, obj_img_path, user_prompt, count=3, on_progres
     for i in range(count):
         pct = int(10 + (80 * i / count))
         _p("GEMINI", pct, f"Gemini 모델이 프리뷰 이미지를 생성하는 중입니다... ({i+1}/{count})")
+        try:
+            img = _call_gemini_once(first_pil, obj_pil, kw, w1, h1, user_prompt, quality_desc)
+            path = os.path.join(OUTPUTS, f"preview_{i}.png")
+            cv2.imwrite(path, img)
+            preview_paths.append(path)
+            log.info(f"프리뷰 {i+1}/{count} 생성 완료: {img.shape[1]}x{img.shape[0]}")
+        except Exception as e:
+            log.warning(f"프리뷰 {i+1}/{count} 생성 실패 (스킵): {e}")
 
-        img = _call_gemini_once(first_pil, obj_pil, kw, w1, h1, user_prompt, quality_desc)
-        path = os.path.join(OUTPUTS, f"preview_{i}.png")
-        cv2.imwrite(path, img)
-        preview_paths.append(path)
-        log.info(f"프리뷰 {i+1}/{count} 생성 완료: {img.shape[1]}x{img.shape[0]}")
+    if not preview_paths:
+        raise RuntimeError("모든 프리뷰 생성 실패")
 
-    _p("GEMINI", 90, "프리뷰 이미지 생성 완료")
+    _p("GEMINI", 90, f"프리뷰 이미지 생성 완료 ({len(preview_paths)}/{count}장)")
     return preview_paths
 
 
