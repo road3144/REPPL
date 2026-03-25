@@ -32,5 +32,12 @@ def download_file(bucket: str, key: str, local_path: str):
 
 def upload_file(local_path: str, bucket: str, key: str):
     log.info(f"S3 upload: {local_path} → s3://{bucket}/{key}")
-    _get_client().upload_file(local_path, bucket, key)
+    extra_args = {}
+    if key.endswith(".mp4"):
+        extra_args["ContentType"] = "video/mp4"
+    elif key.endswith(".png"):
+        extra_args["ContentType"] = "image/png"
+    elif key.endswith(".jpg") or key.endswith(".jpeg"):
+        extra_args["ContentType"] = "image/jpeg"
+    _get_client().upload_file(local_path, bucket, key, ExtraArgs=extra_args if extra_args else None)
     log.info("S3 upload complete")
