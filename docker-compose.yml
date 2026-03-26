@@ -33,6 +33,8 @@ services:
   frontend:
     image: ${FRONTEND_IMAGE}:${TAG:-latest}
     container_name: frontend
+    volumes:
+      - /home/ubuntu/static/videos:/usr/share/nginx/html/videos
     restart: unless-stopped
 
   # ─── Backend (Spring Boot) ────────────────────────────────────

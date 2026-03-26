@@ -444,10 +444,12 @@ def _build_gemini_prompt(kw, w1, h1, user_prompt, frame_quality_desc=""):
             f"- Match the SAME level of sharpness/softness — if the background is blurry "
             f"or soft from video compression, the added object must also appear equally soft. "
             f"Do NOT render the object in crisp high-definition if the background is low-quality.\n"
-            f"- Match the SAME color temperature and white balance.\n"
+            f"- Match the SAME color temperature and white balance — if the scene has warm "
+            f"yellowish indoor lighting, the object must reflect that same warm tone.\n"
             f"- Match the SAME brightness, contrast, and exposure level.\n"
             f"- Match the SAME noise/grain texture if visible.\n"
-            f"- The object should look like it was FILMED by the same camera in the same scene.\n"
+            f"- The object should look like it was FILMED by the same camera in the same scene, "
+            f"not like a clean product photo pasted on top.\n"
         )
 
     return (
@@ -465,12 +467,21 @@ def _build_gemini_prompt(kw, w1, h1, user_prompt, frame_quality_desc=""):
         f"tiles, people, lighting, or any other element. "
         f"If you compare the output with Image 1, the ONLY difference should be "
         f"the newly added {kw}.\n"
+        f"\n"
+        f"===== CRITICAL: DO NOT REMOVE OR REPLACE EXISTING OBJECTS =====\n"
+        f"All existing objects, signs, billboards, posters, furniture, vehicles, and items "
+        f"that are already visible in Image 1 MUST remain in the output EXACTLY as they are. "
+        f"You are ADDING the {kw} to an EMPTY space — NOT replacing anything. "
+        f"If there is a sign, billboard, or any object already at or near the placement location, "
+        f"place the {kw} NEXT TO it, not ON TOP of it. "
+        f"NEVER delete, hide, cover, or modify any pre-existing object in Image 1.\n"
         f"{quality_section}"
         f"\n"
         f"===== TASK =====\n"
-        f"Read the user's Korean request above. It specifies WHERE to place the {kw}. "
-        f"Composite the {kw} from Image 2 onto Image 1 at the EXACT location "
-        f"described in the user request.\n"
+        f"Read the user's Korean request above. It specifies WHERE to ADD the {kw}. "
+        f"ADD the {kw} from Image 2 onto Image 1 at the EXACT location "
+        f"described in the user request. This is purely ADDITIVE — "
+        f"you are placing a NEW object into the scene without changing anything else.\n"
         f"\n"
         f"===== PLACEMENT =====\n"
         f"- Interpret the user's Korean placement description precisely.\n"
@@ -478,10 +489,12 @@ def _build_gemini_prompt(kw, w1, h1, user_prompt, frame_quality_desc=""):
         f"- Add a small natural shadow beneath the {kw} only.\n"
         f"\n"
         f"===== STRICT PROHIBITIONS =====\n"
+        f"- Do NOT remove, delete, hide, or replace ANY existing object in Image 1.\n"
         f"- Do NOT alter, repaint, recolor, or regenerate ANY part of Image 1.\n"
         f"- Do NOT add new furniture, tiles, patterns, or surfaces.\n"
         f"- Do NOT change the floor, walls, background, or any existing objects.\n"
         f"- Do NOT change people's appearance, clothing, or positions.\n"
+        f"- Do NOT move, resize, or modify existing signs, billboards, or posters.\n"
         f"- Do NOT crop, rotate, or change to portrait orientation.\n"
         f"- The output MUST be {w1}x{h1} LANDSCAPE, identical to Image 1 except for the added {kw}."
     )
@@ -887,127 +900,117 @@ def extract_shadow_map(f1, f2, mask):
              f"검증된 그림자: {np.sum(valid_shadow > 0)}px)")
     return shadow_map
 
-def _diff_analyze(first_frame, generated_frame):
+def _semantic_diff_analyze(first_frame, generated_frame, keyword):
     """
-    first_frame과 generated_frame의 픽셀 차이를 분석하여
-    추가된 객체의 bbox와 foreground 포인트 힌트를 반환한다.
-    
-    핵심: 평균 diff 강도 × √면적 스코어로 진짜 추가된 객체를 구분.
-    
-    반환: (bbox, fg_points) 또는 None
+    단순 전역 픽셀 비교가 아닌 의미론적(Semantic) 비교를 수행한다.
+    1. DINO를 사용하여 합성 이미지에서 객체 후보(BBox)들을 찾는다.
+    2. 각 후보 BBox 내부에서만 원본 대비 픽셀 변화량을 측정한다.
+    3. 전역 조명 변화/배경 노이즈를 무시하고 실질적으로 '새롭게 등장한' 객체를 확정한다.
     """
     h1, w1 = first_frame.shape[:2]
     h2, w2 = generated_frame.shape[:2]
     if (h1, w1) != (h2, w2):
-        first_resized = cv2.resize(first_frame, (w2, h2), interpolation=cv2.INTER_AREA)
+        f1_align = cv2.resize(first_frame, (w2, h2), interpolation=cv2.INTER_AREA)
     else:
-        first_resized = first_frame
+        f1_align = first_frame
 
-    lab1 = cv2.cvtColor(first_resized, cv2.COLOR_BGR2Lab).astype(np.float32)
-    lab2 = cv2.cvtColor(generated_frame, cv2.COLOR_BGR2Lab).astype(np.float32)
-    color_diff = np.sqrt(np.sum((lab1 - lab2) ** 2, axis=2))
-
-    threshold = max(np.percentile(color_diff, 97), 20)
-    binary = (color_diff > threshold).astype(np.uint8) * 255
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
-    binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=2)
-    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel, iterations=2)
-
-    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary, 8)
-    if num_labels <= 1:
+    log.info(f"의미론적 객체 탐색: '{keyword}' 후보 찾는 중...")
+    try:
+        bboxes = _dino_detect(generated_frame, keyword)
+    except Exception as e:
+        log.warning(f"DINO가 합성 프레임에서 '{keyword}' 탐지 실패: {e}")
         return None
 
-    # ── 스코어링: 진짜 추가된 객체 vs 배경 노이즈 구분 ──
-    total_pixels = h2 * w2
-    candidates = []
-    for i in range(1, num_labels):
-        area = stats[i, cv2.CC_STAT_AREA]
-        if area < 300:
+    if not bboxes:
+        return None
+
+    # 미세 노이즈 무시를 위해 약간의 블러 적용 후 Lab 색 공간 비교
+    blur1 = cv2.GaussianBlur(f1_align, (11, 11), 0)
+    blur2 = cv2.GaussianBlur(generated_frame, (11, 11), 0)
+    lab1 = cv2.cvtColor(blur1, cv2.COLOR_BGR2Lab).astype(np.float32)
+    lab2 = cv2.cvtColor(blur2, cv2.COLOR_BGR2Lab).astype(np.float32)
+    diff_map = np.sqrt(np.sum((lab1 - lab2) ** 2, axis=2))
+
+    best_score = -1
+    best_bbox = None
+    best_fg_points = []
+
+    for i, bb in enumerate(bboxes):
+        x, y, w, h = bb
+        roi_diff = diff_map[y:y+h, x:x+w]
+        if roi_diff.size == 0:
             continue
-        comp_mask = (labels == i)
-        mean_diff = color_diff[comp_mask].mean()
-        score = mean_diff * np.sqrt(area)
-        candidates.append((i, score, mean_diff, area))
 
-    if not candidates:
+        # 해당 BBox 내에서 픽셀 변화가 가장 큰 상위 30% 영역의 평균 변화량 계산
+        flat_diff = np.sort(roi_diff.flatten())[::-1]
+        top_k = max(1, len(flat_diff) // 3)
+        mean_diff = flat_diff[:top_k].mean()
+
+        # 작은 노이즈가 높은 평균을 가지는 것을 막기 위해 면적 가중치 추가
+        score = mean_diff * np.sqrt(w * h)
+        log.info(f"후보 {i+1} {bb} - 상위 변화율: {mean_diff:.1f}, 스코어: {score:.0f}")
+
+        if score > best_score:
+            best_score = score
+            best_bbox = bb
+
+            # Foreground 힌트 포인트 추출 (가장 뚜렷하게 변한 픽셀들)
+            hot_threshold = np.percentile(roi_diff, 85)
+            ys, xs = np.where(roi_diff >= hot_threshold)
+            fg = []
+            if len(xs) > 0:
+                p_count = min(5, len(xs))
+                indices = np.linspace(0, len(xs)-1, p_count, dtype=int)
+                for idx in indices:
+                    fg.append((int(x + xs[idx]), int(y + ys[idx])))
+
+            # 중앙점 하나를 확실하게 추가
+            cx, cy = x + w // 2, y + h // 2
+            if fg:
+                fg[0] = (cx, cy)
+            else:
+                fg.append((cx, cy))
+            best_fg_points = fg
+
+    # 원본 대비 유의미한 변화가 없다면(기존 배경의 객체를 잡았다면) 무시
+    if best_score < 50:
+        log.warning("감지된 객체들이 원본과 너무 동일합니다 (유의미한 추가 객체 아님).")
         return None
 
-    candidates.sort(key=lambda x: x[1], reverse=True)
-    best_label, best_score, best_mean_diff, best_area = candidates[0]
-
-    if best_area < total_pixels * 0.001:
-        log.info(f"Diff: 최고 스코어 영역 너무 작음 ({best_area}px)")
-        return None
-
-    bx = stats[best_label, cv2.CC_STAT_LEFT]
-    by = stats[best_label, cv2.CC_STAT_TOP]
-    bw = stats[best_label, cv2.CC_STAT_WIDTH]
-    bh = stats[best_label, cv2.CC_STAT_HEIGHT]
-
-    pad = int(max(bw, bh) * 0.2)
-    bx = max(0, bx - pad)
-    by = max(0, by - pad)
-    bw = min(bw + 2 * pad, w2 - bx)
-    bh = min(bh + 2 * pad, h2 - by)
-
-    # ── Foreground 포인트: 컴포넌트 내 diff 상위 픽셀들 ──
-    comp_mask = (labels == best_label).astype(np.uint8)
-    masked_diff = color_diff * comp_mask
-    hot_threshold = np.percentile(masked_diff[comp_mask > 0], 80)
-    ys, xs = np.where(masked_diff >= hot_threshold)
-
-    if len(xs) == 0:
-        return None
-
-    n_points = min(5, len(xs))
-    indices = np.linspace(0, len(xs) - 1, n_points, dtype=int)
-    fg_points = [(int(xs[i]), int(ys[i])) for i in indices]
-
-    cx_fg = int(np.median(xs))
-    cy_fg = int(np.median(ys))
-    fg_points.insert(0, (cx_fg, cy_fg))
-
-    log.info(f"Diff ✅: score={best_score:.0f} (mean_diff={best_mean_diff:.1f}, area={best_area}), "
-             f"bbox=({bx},{by},{bw},{bh}), fg_points={len(fg_points)}개")
-    if len(candidates) > 1:
-        runner_up = candidates[1]
-        log.info(f"  2위: score={runner_up[1]:.0f} (mean_diff={runner_up[2]:.1f}, area={runner_up[3]}) — 배제")
-
-    return (bx, by, bw, bh), fg_points
+    log.info(f"선택 완료! 새로운 객체: BBox={best_bbox}, fg_points={len(best_fg_points)}개")
+    return best_bbox, best_fg_points
 
 
 def step4_extract(first_frame, generated_frame, keyword):
     """
-    추가된 객체 추출. 하이브리드 전략:
-      1) Diff로 bbox + foreground 포인트 추출 (스코어링)
-      2) SAM에 bbox + fg 포인트를 전달하여 정밀 마스크 추출
-      폴백: Diff 실패 시 DINO bbox → SAM
+    추가된 객체 추출.
+    DINO를 이용해 의미론적 후보를 찾은 뒤, 원본과 변화량이 가장 큰 객체를 추출.
     """
     fh, fw = generated_frame.shape[:2]
 
-    # ── Diff 분석: bbox + foreground 포인트 ──
-    log.info("객체 추출: Diff로 변경 영역 + fg 포인트 분석...")
-    diff_result = _diff_analyze(first_frame, generated_frame)
+    log.info("객체 추출: 의미론적 객체 비교(Semantic Diff) 진행 중...")
+    diff_result = _semantic_diff_analyze(first_frame, generated_frame, keyword)
+
+    combined_mask = np.zeros((fh, fw), dtype=np.uint8)
 
     if diff_result is not None:
         diff_bbox, fg_points = diff_result
-        log.info(f"Diff bbox 발견 → SAM에 fg 포인트 {len(fg_points)}개 전달...")
+        log.info(f"의미론적 추가 객체 발견 → SAM에 힌트 포인트 전달...")
         combined_mask = _sam_segment(generated_frame, diff_bbox, fg_points=fg_points)
         combined_mask = _refine_mask(combined_mask, generated_frame, diff_bbox)
-        log.info("Diff + SAM 하이브리드 추출 완료")
     else:
-        # ── 폴백: DINO + SAM ──
-        log.info("Diff 탐색 불충분 — DINO + SAM 폴백...")
-        all_bboxes = _dino_detect(generated_frame, keyword)
-
-        combined_mask = np.zeros((fh, fw), dtype=np.uint8)
-        for i, bb in enumerate(all_bboxes):
-            log.info(f"SAM 세그멘테이션 [{i+1}/{len(all_bboxes)}]: bbox={bb}")
-            mask_i = _sam_segment(generated_frame, bb)
-            mask_i = _refine_mask(mask_i, generated_frame, bb)
-            combined_mask = cv2.bitwise_or(combined_mask, mask_i)
-        log.info(f"마스크 결합 완료: {len(all_bboxes)}개 객체")
+        log.warning("의미론적 객체 비교 실패 — DINO 전체 객체 SAM 폴백 진행...")
+        try:
+            all_bboxes = _dino_detect(generated_frame, keyword)
+            for i, bb in enumerate(all_bboxes):
+                log.info(f"SAM 세그멘테이션 [{i+1}/{len(all_bboxes)}]: bbox={bb}")
+                mask_i = _sam_segment(generated_frame, bb)
+                mask_i = _refine_mask(mask_i, generated_frame, bb)
+                combined_mask = cv2.bitwise_or(combined_mask, mask_i)
+            log.info(f"마스크 결합 완료: {len(all_bboxes)}개 객체")
+        except Exception as e:
+            log.error(f"폴백 DINO 탐지마저 실패했습니다: {e}")
+            raise RuntimeError("객체를 추출할 수 없습니다.")
 
     # 그림자 추출
     eroded_mask = cv2.erode(combined_mask, np.ones((5, 5), np.uint8), iterations=1)
@@ -1062,6 +1065,15 @@ def step5_scale(f2, mask, shadow_map, bbox, vw, vh):
 
 
 def step6_composite(vpath, obj, mr, sr, vbbox, opath):
+    """
+    영상 합성 + Y축 기반 가림(Occlusion).
+
+    원리: 화면 아래쪽에 있는 물체 = 카메라에 가까움.
+    사람의 발(바닥 Y)이 합성 객체의 바닥 Y보다 아래에 있으면 → 사람이 앞에 있음 → 가림.
+
+    가림 마스크는 0 또는 1 (이진). 중간값 없음 → 반투명 현상 원천 차단.
+    경계만 3px 블러로 살짝 부드럽게.
+    """
     cap = cv2.VideoCapture(vpath)
     vw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     vh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -1080,57 +1092,54 @@ def step6_composite(vpath, obj, mr, sr, vbbox, opath):
     fg = obj[oy1:oy2, ox1:ox2].astype(np.float32)
     cm = mr[oy1:oy2, ox1:ox2]
 
-    # 소프트 알파 (어두운 테두리 방지를 위해 좁은 페더링)
     alpha = cv2.GaussianBlur(cm.astype(np.float32) / 255, (0, 0), sigmaX=1.5)
     inner = cv2.erode(cm, np.ones((3, 3), np.uint8), iterations=2)
     alpha[inner > 0] = 1.0
     alpha = np.clip(alpha, 0, 1)
     a3 = np.stack([alpha] * 3, axis=-1)
 
-    # AI 생성 원본 그림자 추출 비율
     clip_shadow = sr[oy1:oy2, ox1:ox2]
     s3 = np.stack([clip_shadow] * 3, axis=-1)
 
+    roi_h, roi_w = y2 - y1, x2 - x1
+
     log.info(f"합성: {vw}×{vh} {fps:.0f}fps {total}f")
 
-    # --- 추가: 깊이 추정(Z-Depth) 모델 적용 ---
-    log.info("Z-Depth 가림(Occlusion) 처리를 위해 Depth Estimation 모델 로딩 (Intel/dpt-large)...")
-    from transformers import pipeline
-    from PIL import Image
-    device_id = 0 if torch.cuda.is_available() else -1
-    depth_estimator = pipeline(task="depth-estimation", model="Intel/dpt-large", device=device_id)
+    # ── 합성 객체의 바닥 Y좌표 (영상 좌표계) ──
+    mask_rows = np.where(cm.max(axis=1) > 128)[0]
+    if len(mask_rows) > 0:
+        obj_bottom_y_in_roi = mask_rows[-1]
+        obj_bottom_y_global = y1 + obj_bottom_y_in_roi
+    else:
+        obj_bottom_y_in_roi = roi_h
+        obj_bottom_y_global = y2
 
-    # --- 첫 프레임 기준 객체의 가상 깊이(Z-Depth) 산출 ---
+    log.info(f"합성 객체 바닥 Y: {obj_bottom_y_global} (영상), {obj_bottom_y_in_roi} (ROI내)")
+
+    # ── MOG2 배경 모델 — 전체 프레임에서 실행 ──
+    bg_sub = cv2.createBackgroundSubtractorMOG2(
+        history=60, varThreshold=30, detectShadows=False
+    )
     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-    ret, bg_frame = cap.read()
-    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # 위치 초기화
-    
-    bg_pil = Image.fromarray(cv2.cvtColor(bg_frame, cv2.COLOR_BGR2RGB))
-    bg_depth_out = depth_estimator(bg_pil)
-    # 크기 조절된 np array (0~255 값. 값이 클수록 카메라에 가까움)
-    bg_depth = np.array(bg_depth_out["depth"].resize((vw, vh), Image.Resampling.BILINEAR))
-    
-    # 합성 물체가 바닥에 닿는 하단 부분(y2 근처)의 깊이를 객체의 베이스(가상) 깊이로 설정
-    # 안정적인 측정을 위해 ROI 내 하단 20px 영역의 중앙값 사용
-    bottom_y_start = max(y1, y2 - 20)
-    base_depth = np.median(bg_depth[bottom_y_start:y2, x1:x2])
-    log.info(f"합성 객체의 추정 Z-Depth 베이스 값: {base_depth:.1f} (0~255)")
+    for _ in range(min(60, total)):
+        ret, lf = cap.read()
+        if not ret:
+            break
+        bg_sub.apply(lf, learningRate=0.03)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
+    # ── 파라미터 ──
+    MIN_COMPONENT = max(2000, int(vw * vh * 0.005))
+    OCC_ON_THRESH = 0.02
+    OCC_OFF_FRAMES = 5
+
+    log.info(f"Occlusion: 전체 프레임 MOG2 + 히스테리시스 "
+             f"(min_comp={MIN_COMPONENT}px, ROI={roi_w}x{roi_h})")
 
     n = 0
-    prev_occ = np.zeros((y2 - y1, x2 - x1), dtype=np.float32)  # 시간축 스무딩용
-
-    # 첫 프레임 ROI 저장 (움직임 감지 기준)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-    ret, ref_frame = cap.read()
-    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-    ref_roi_gray = cv2.cvtColor(ref_frame[y1:y2, x1:x2], cv2.COLOR_BGR2GRAY).astype(np.float32)
-
-    # 움직임 감지 임계값: ROI 내 평균 픽셀 변화가 이 값 이상이면 "무언가 지나감"
-    MOTION_THRESHOLD = 15.0
-    # 깊이 허용 오차: 노이즈 대비 넉넉하게 설정
-    DEPTH_TOLERANCE = 20
-    # 시간축 스무딩 계수: 0에 가까울수록 이전 프레임 영향 큼 (깜빡임 방지)
-    TEMPORAL_ALPHA = 0.3
+    occ_active = False
+    no_occ_count = 0
+    last_occ_mask = np.zeros((roi_h, roi_w), dtype=np.uint8)
 
     while True:
         ret, frame = cap.read()
@@ -1139,53 +1148,72 @@ def step6_composite(vpath, obj, mr, sr, vbbox, opath):
 
         roi = frame[y1:y2, x1:x2].astype(np.float32)
 
-        # ------------------------------------------------------------
-        # 움직임 감지 → 실제로 ROI에 변화가 있을 때만 Z-Depth 가림 적용
-        # ------------------------------------------------------------
-        curr_roi_gray = cv2.cvtColor(frame[y1:y2, x1:x2], cv2.COLOR_BGR2GRAY).astype(np.float32)
-        motion_diff = np.abs(curr_roi_gray - ref_roi_gray).mean()
+        # ── 1) 합성 객체를 완전히 합성 (가림 무관) ──
+        composited = roi * s3
+        composited = fg * a3 + composited * (1.0 - a3)
 
-        if motion_diff > MOTION_THRESHOLD:
-            # 실제 움직임 감지 → 깊이 기반 가림 판정
-            frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            curr_depth_out = depth_estimator(frame_pil)
-            curr_depth = np.array(curr_depth_out["depth"].resize((vw, vh), Image.Resampling.BILINEAR))
-            roi_depth = curr_depth[y1:y2, x1:x2]
+        # ── 2) 전체 프레임에서 MOG2 전경 검출 ──
+        fg_mask_full = bg_sub.apply(frame, learningRate=0.001)
 
-            raw_occ = (roi_depth > (base_depth + DEPTH_TOLERANCE)).astype(np.float32)
-            # 작은 노이즈 영역 제거 (열림 연산)
-            kernel = np.ones((5, 5), np.uint8)
-            raw_occ_u8 = (raw_occ * 255).astype(np.uint8)
-            raw_occ_u8 = cv2.morphologyEx(raw_occ_u8, cv2.MORPH_OPEN, kernel)
-            raw_occ = raw_occ_u8.astype(np.float32) / 255.0
+        k_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        fg_mask_full = cv2.morphologyEx(fg_mask_full, cv2.MORPH_OPEN, k_open, iterations=1)
+        k_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+        fg_mask_full = cv2.morphologyEx(fg_mask_full, cv2.MORPH_CLOSE, k_close, iterations=2)
+
+        # ── 3) 전체 프레임에서 큰 전경 컴포넌트 찾기 + ROI 교차 ──
+        curr_occ = np.zeros((roi_h, roi_w), dtype=np.uint8)
+
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(fg_mask_full, 8)
+        for lbl in range(1, num_labels):
+            if stats[lbl, cv2.CC_STAT_AREA] < MIN_COMPONENT:
+                continue
+
+            comp_bottom_y = stats[lbl, cv2.CC_STAT_TOP] + stats[lbl, cv2.CC_STAT_HEIGHT]
+
+            if comp_bottom_y >= obj_bottom_y_global * 0.7:
+                comp_full = (labels == lbl).astype(np.uint8) * 255
+                comp_roi = comp_full[y1:y2, x1:x2]
+
+                if cv2.countNonZero(comp_roi) > 0:
+                    contours, _ = cv2.findContours(
+                        comp_roi, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                    )
+                    cv2.drawContours(curr_occ, contours, -1, 255, cv2.FILLED)
+
+        curr_occ = cv2.bitwise_and(curr_occ, cm)
+        curr_occ_ratio = (curr_occ > 0).sum() / max(1, (cm > 128).sum())
+
+        # ── 4) 히스테리시스 상태 관리 ──
+        if not occ_active:
+            if curr_occ_ratio >= OCC_ON_THRESH:
+                occ_active = True
+                no_occ_count = 0
+                last_occ_mask = curr_occ.copy()
         else:
-            # 움직임 없음 → 가림 없음
-            raw_occ = np.zeros((y2 - y1, x2 - x1), dtype=np.float32)
+            if curr_occ_ratio >= OCC_ON_THRESH:
+                last_occ_mask = curr_occ.copy()
+                no_occ_count = 0
+            else:
+                no_occ_count += 1
+                if no_occ_count >= OCC_OFF_FRAMES:
+                    occ_active = False
+                    last_occ_mask = np.zeros((roi_h, roi_w), dtype=np.uint8)
 
-        # 시간축 스무딩: 급격한 변화 방지
-        smoothed_occ = TEMPORAL_ALPHA * raw_occ + (1.0 - TEMPORAL_ALPHA) * prev_occ
-        prev_occ = smoothed_occ
+        # ── 5) 가림 마스크 적용 ──
+        if occ_active:
+            occ_float = last_occ_mask.astype(np.float32) / 255.0
+            occ_float = cv2.GaussianBlur(occ_float, (5, 5), 0)
+            occ_float = np.where(occ_float > 0.3, 1.0, 0.0)
+        else:
+            occ_float = np.zeros((roi_h, roi_w), dtype=np.float32)
 
-        # 매우 약한 가림은 무시 (임계값 이하 제거)
-        smoothed_occ[smoothed_occ < 0.3] = 0.0
-
-        # 가림막 마스크 경계선을 부드럽게
-        occ_float = cv2.GaussianBlur(smoothed_occ, (15, 15), 0)
         occ_3 = np.stack([occ_float] * 3, axis=-1)
 
-        # ------------------------------------------------------------
-        # 합성 계산
-        # ------------------------------------------------------------
-        occluded_a3 = a3 * (1.0 - occ_3)
-        occluded_s3 = 1.0 - ((1.0 - s3) * (1.0 - occ_3))
+        # ── 6) 최종 합성 ──
+        original_roi = frame[y1:y2, x1:x2].astype(np.float32)
+        final_roi = composited * (1.0 - occ_3) + original_roi * occ_3
 
-        # (1) AI 그림자를 배경에 적용
-        roi = roi * occluded_s3
-
-        # (2) 객체 알파 블렌딩
-        roi = fg * occluded_a3 + roi * (1.0 - occluded_a3)
-
-        frame[y1:y2, x1:x2] = np.clip(roi, 0, 255).astype(np.uint8)
+        frame[y1:y2, x1:x2] = np.clip(final_roi, 0, 255).astype(np.uint8)
         out.write(frame)
         n += 1
 

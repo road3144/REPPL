@@ -17,6 +17,9 @@ env/
 *-key.json
 ssafy-reppl-pjt-*.json
 
+# Local development
+main_local.py
+
 # Logs
 *.log
 logs/
