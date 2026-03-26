@@ -10,7 +10,7 @@ export function NavBar() {
         {/* Logo */}
         <div className="flex items-center">
           <p className="nav-logo">
-            <span>Re:PPL</span>
+            <span>RePPL</span>
           </p>
           <span className="nav-badge hidden sm:inline">Virtual Product Placement</span>
         </div>

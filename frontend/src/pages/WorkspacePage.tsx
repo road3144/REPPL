@@ -196,7 +196,7 @@ function WorkspaceTopBar() {
     <header className="workspace-topbar">
       <div className="workspace-topbar-left">
         <Link to="/" className="workspace-topbar-logo">
-          Re:<span>PPL</span>
+          Re<span>PPL</span>
         </Link>
       </div>
 
