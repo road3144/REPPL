@@ -82,7 +82,7 @@ export function LandingPageSimple() {
         textShadow: '0 1px 8px rgba(0,0,0,0.45)',
         borderTop: '1px solid rgba(255,255,255,0.08)',
       }}>
-        © 2026 RePPL · 삼성 청년 SW 아카데미 14기 · A401팀
+        © 2026 RePPL · 삼성 청년 SW·AI 아카데미 14기 · A401팀
       </footer>
     </div>
   );
