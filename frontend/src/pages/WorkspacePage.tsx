@@ -26,12 +26,6 @@ const STATUS_CFG: Record<
 type Tab = 'all' | 'running' | 'waiting' | 'done';
 type WorkspaceSection = 'studio' | 'results' | 'history';
 
-const WORKSPACE_SECTIONS: Array<{ id: WorkspaceSection; label: string }> = [
-  { id: 'studio', label: '작업 스튜디오' },
-  { id: 'results', label: '내 결과물' },
-  { id: 'history', label: '작업내역' },
-];
-
 const STATUS_TAB_ITEMS: Array<{ id: Tab; label: string }> = [
   { id: 'all', label: '전체' },
   { id: 'running', label: '처리 중' },
@@ -197,30 +191,13 @@ function SidebarHelpIcon({ className = 'w-4 h-4' }: { className?: string }) {
   );
 }
 
-function WorkspaceTopBar({ activeSection, onCreateJob }: {
-  activeSection: WorkspaceSection;
-  onCreateJob: () => void;
-}) {
-  const activeLabel = WORKSPACE_SECTIONS.find((item) => item.id === activeSection)?.label ?? '작업 스튜디오';
-
+function WorkspaceTopBar() {
   return (
     <header className="workspace-topbar">
       <div className="workspace-topbar-left">
         <Link to="/" className="workspace-topbar-logo">
           Re:<span>PPL</span>
         </Link>
-        <span className="workspace-topbar-separator" />
-        <div className="workspace-topbar-breadcrumb">
-          <span>{activeLabel}</span>
-          <span>/</span>
-          {activeSection === 'studio' ? (
-            <button type="button" className="workspace-topbar-breadcrumb-action" onClick={onCreateJob}>
-              새 작업 만들기
-            </button>
-          ) : (
-            <strong>{activeLabel}</strong>
-          )}
-        </div>
       </div>
 
     </header>
@@ -253,21 +230,21 @@ function WorkspaceSidebar({ activeSection, onSelect, onCreateJob, onOpenHelp, on
         </button>
         <button
           type="button"
-          className={`workspace-sidebar-item ${activeSection === 'results' ? 'active' : ''}`}
-          onClick={() => onSelect('results')}
-        >
-          <SidebarFileIcon />
-          <span>내 결과물</span>
-          <span className="workspace-sidebar-count">{counts.results}</span>
-        </button>
-        <button
-          type="button"
           className={`workspace-sidebar-item ${activeSection === 'history' ? 'active' : ''}`}
           onClick={() => onSelect('history')}
         >
           <SidebarClockIcon />
           <span>작업 내역</span>
           <span className="workspace-sidebar-count">{counts.history}</span>
+        </button>
+        <button
+          type="button"
+          className={`workspace-sidebar-item ${activeSection === 'results' ? 'active' : ''}`}
+          onClick={() => onSelect('results')}
+        >
+          <SidebarFileIcon />
+          <span>내 결과물</span>
+          <span className="workspace-sidebar-count">{counts.results}</span>
         </button>
       </div>
 
@@ -1048,7 +1025,7 @@ export function WorkspacePage() {
 
   return (
     <div className="workspace-shell">
-      <WorkspaceTopBar activeSection={activeSection} onCreateJob={openCreateModal} />
+      <WorkspaceTopBar />
 
       <div className="workspace-shell-body">
         <WorkspaceSidebar

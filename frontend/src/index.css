@@ -809,7 +809,7 @@ h6 {
   background: #fff;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.7rem;
   padding: 0 1rem;
   flex-shrink: 0;
@@ -833,44 +833,7 @@ h6 {
 .workspace-topbar-left {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
   min-width: 0;
-}
-
-.workspace-topbar-separator {
-  width: 1px;
-  height: 22px;
-  background: #e5e7ef;
-  flex-shrink: 0;
-}
-
-.workspace-topbar-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.93rem;
-  color: #6b7280;
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.workspace-topbar-breadcrumb strong {
-  color: #111827;
-  font-weight: 800;
-}
-
-.workspace-topbar-breadcrumb-action {
-  border: none;
-  background: none;
-  color: #111827;
-  font-size: 0.93rem;
-  font-weight: 800;
-  padding: 0;
-  cursor: pointer;
-}
-
-.workspace-topbar-breadcrumb-action:hover {
-  color: #4a6cf7;
 }
 
 .workspace-create-btn {
@@ -1630,17 +1593,8 @@ h6 {
     gap: 10px;
   }
 
-  .workspace-topbar-breadcrumb {
-    font-size: 0.88rem;
-  }
-
   .workspace-topbar-left {
     min-width: 0;
-    gap: 0.55rem;
-  }
-
-  .workspace-topbar-breadcrumb-action {
-    font-size: 0.88rem;
   }
 
   .workspace-guide-modal {
@@ -1663,10 +1617,6 @@ h6 {
 }
 
 @media (max-width: 768px) {
-  .workspace-topbar-breadcrumb {
-    display: none;
-  }
-
   .workspace-create-btn {
     padding: 0.62rem 1.05rem;
     font-size: 0.9rem;
