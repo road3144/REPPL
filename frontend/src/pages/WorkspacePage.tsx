@@ -107,24 +107,6 @@ const GUIDE_FAQ_ITEMS = [
   },
 ] as const;
 
-const GUIDE_REFERENCE_IMAGES = [
-  {
-    title: '파이프라인 흐름',
-    description: '요청부터 최종 출력까지 단계 구조',
-    src: '/images/process_flow.png',
-  },
-  {
-    title: '전/후 비교 예시',
-    description: '합성 결과 품질 체크 기준',
-    src: '/images/before_after_demo.png',
-  },
-  {
-    title: '결과물 활용 예시',
-    description: '숏폼 배포 화면 예시',
-    src: '/images/shorts_mockup.png',
-  },
-] as const;
-
 function filterJobsByTab(jobs: JobItem[], tab: Tab): JobItem[] {
   if (tab === 'running') return jobs.filter((job) => job.status === 'RUNNING');
   if (tab === 'waiting') return jobs.filter((job) => job.status === 'QUEUED');
@@ -215,15 +197,6 @@ function SidebarHelpIcon({ className = 'w-4 h-4' }: { className?: string }) {
   );
 }
 
-function TopbarBellIcon({ className = 'w-5 h-5' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M15 18H5a1 1 0 0 1-.9-1.4l1.1-2.1V11a6 6 0 1 1 12 0v3.5l1.1 2.1A1 1 0 0 1 17.4 18H15" />
-      <path d="M10 18a2 2 0 0 0 4 0" />
-    </svg>
-  );
-}
-
 function WorkspaceTopBar({ activeSection, onCreateJob }: {
   activeSection: WorkspaceSection;
   onCreateJob: () => void;
@@ -250,11 +223,6 @@ function WorkspaceTopBar({ activeSection, onCreateJob }: {
         </div>
       </div>
 
-      <div className="workspace-topbar-actions">
-        <button type="button" className="workspace-icon-btn" aria-label="알림">
-          <TopbarBellIcon />
-        </button>
-      </div>
     </header>
   );
 }
@@ -408,20 +376,6 @@ function WorkspaceGuideModal({ onClose }: { onClose: () => void }) {
             </div>
           </section>
 
-          {/* <section className="workspace-guide-section">
-            <h3>시각 참고 자료</h3>
-            <div className="workspace-guide-image-grid">
-              {GUIDE_REFERENCE_IMAGES.map((item) => (
-                <figure key={item.src} className="workspace-guide-image-card">
-                  <img src={item.src} alt={item.title} loading="lazy" />
-                  <figcaption>
-                    <strong>{item.title}</strong>
-                    <span>{item.description}</span>
-                  </figcaption>
-                </figure>
-              ))}
-            </div>
-          </section> */}
         </div>
       </section>
     </>

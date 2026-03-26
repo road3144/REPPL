@@ -873,12 +873,6 @@ h6 {
   color: #4a6cf7;
 }
 
-.workspace-topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-
 .workspace-create-btn {
   border: none;
   border-radius: 9px;
@@ -893,25 +887,6 @@ h6 {
 
 .workspace-create-btn:hover {
   background: #3f5ce6;
-}
-
-.workspace-icon-btn {
-  width: 34px;
-  height: 34px;
-  border: 1px solid #e5e7ef;
-  border-radius: 9999px;
-  background: #fff;
-  color: #6b7280;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.workspace-icon-btn:hover {
-  border-color: #d1d5db;
-  color: #334155;
 }
 
 .workspace-sidebar {
@@ -1662,10 +1637,6 @@ h6 {
   .workspace-topbar-left {
     min-width: 0;
     gap: 0.55rem;
-  }
-
-  .workspace-topbar-actions {
-    margin-left: auto;
   }
 
   .workspace-topbar-breadcrumb-action {
