@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getJobs, initSession } from '../services/api';
+import { useWorkspaceSettings } from '../services/workspaceSettings';
 
 type ToastEntry = {
   jobId: string;
@@ -26,12 +27,47 @@ function isCompletionTransition(prevStatus: string | undefined, nextStatus: stri
   return (prevStatus === 'RUNNING' || prevStatus === 'QUEUED') && nextStatus === 'COMPLETED';
 }
 
+function playCompletionSound() {
+  try {
+    const AudioCtx = window.AudioContext || (window as Window & typeof globalThis & {
+      webkitAudioContext?: typeof AudioContext;
+    }).webkitAudioContext;
+
+    if (!AudioCtx) return;
+
+    const context = new AudioCtx();
+    const oscillator = context.createOscillator();
+    const gainNode = context.createGain();
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(880, context.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(1320, context.currentTime + 0.12);
+
+    gainNode.gain.setValueAtTime(0.0001, context.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.18);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.18);
+
+    window.setTimeout(() => {
+      void context.close();
+    }, 260);
+  } catch {
+    // Ignore browser audio policy failures.
+  }
+}
+
 export function GlobalJobCompletionToast() {
+  const { settings } = useWorkspaceSettings();
   const [toast, setToast] = useState<ToastEntry | null>(null);
 
   const prevStatusByJobRef = useRef<Map<string, string>>(new Map());
   const notifiedJobIdsRef = useRef<Set<string>>(new Set());
   const queueRef = useRef<ToastEntry[]>([]);
+  const settingsRef = useRef(settings);
   const initializedRef = useRef(false);
   const sessionReadyRef = useRef(false);
   const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,6 +83,19 @@ export function GlobalJobCompletionToast() {
       return current;
     });
   };
+
+  useEffect(() => {
+    settingsRef.current = settings;
+    if (settings.notifications.toastEnabled) {
+      return;
+    }
+
+    setToast(null);
+    queueRef.current = [];
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+    }
+  }, [settings]);
 
   useEffect(() => {
     if (!toast) return;
@@ -86,7 +135,29 @@ export function GlobalJobCompletionToast() {
           if (notifiedJobIdsRef.current.has(job.jobId)) continue;
 
           notifiedJobIdsRef.current.add(job.jobId);
-          enqueueToast({ jobId: job.jobId });
+          const currentSettings = settingsRef.current;
+
+          if (currentSettings.notifications.toastEnabled) {
+            enqueueToast({ jobId: job.jobId });
+          }
+
+          if (currentSettings.notifications.soundEnabled) {
+            playCompletionSound();
+          }
+
+          if (
+            currentSettings.notifications.browserEnabled &&
+            typeof Notification !== 'undefined' &&
+            Notification.permission === 'granted'
+          ) {
+            try {
+              new Notification('합성 작업 완료', {
+                body: `완료 작업: ${job.jobId}`,
+              });
+            } catch {
+              // Ignore notification API failures.
+            }
+          }
         }
 
         prevStatusByJobRef.current = nextStatusByJob;

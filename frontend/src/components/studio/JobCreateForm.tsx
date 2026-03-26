@@ -1,4 +1,4 @@
-import { DragEvent, FormEvent, useCallback, useRef, useState } from 'react';
+import { DragEvent, FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { createPreviewJob, getJobStatus } from '../../services/api';
 import { getImageUploadUrls, getVideoUploadUrl, uploadToS3 } from '../../services/s3';
 import type { JobStatusResponse } from '../../services/types';
@@ -8,6 +8,7 @@ type JobCreateFormProps = {
   onError: (message: string | null) => void;
   /** If provided, called after upload completes instead of proceeding to createJob */
   onUploaded?: (videoKey: string, imageKey: string, prompt: string) => void;
+  defaultPlacementPrompt?: string;
   className?: string;
 };
 
@@ -48,12 +49,19 @@ function UploadTrayIcon({ className = 'w-7 h-7' }: { className?: string }) {
   );
 }
 
-export function JobCreateForm({ onCreated, onError, onUploaded, className }: JobCreateFormProps) {
+export function JobCreateForm({
+  onCreated,
+  onError,
+  onUploaded,
+  defaultPlacementPrompt,
+  className,
+}: JobCreateFormProps) {
+  const normalizedDefaultPrompt = defaultPlacementPrompt ?? '';
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [refImageFile, setRefImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [placementPrompt, setPlacementPrompt] = useState('');
+  const [placementPrompt, setPlacementPrompt] = useState(normalizedDefaultPrompt);
   const [stage, setStage] = useState<SubmitStage>('idle');
   const [videoDragOver, setVideoDragOver] = useState(false);
   const [imageDragOver, setImageDragOver] = useState(false);
@@ -63,6 +71,10 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
 
   const submitting = stage !== 'idle';
   const canSubmit = !!videoFile && !!refImageFile && placementPrompt.trim().length > 0 && !submitting;
+
+  useEffect(() => {
+    setPlacementPrompt(normalizedDefaultPrompt);
+  }, [normalizedDefaultPrompt]);
 
   /* ── File handlers ── */
   const handleVideoSelect = useCallback((file: File | null) => {
@@ -145,7 +157,7 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
         onUploaded(videoUpload.upload.video.key, uploadedRefImage.key, trimmedPlacementPrompt);
         setVideoFile(null);
         setRefImageFile(null);
-        setPlacementPrompt('');
+        setPlacementPrompt(normalizedDefaultPrompt);
         if (videoPreview) { URL.revokeObjectURL(videoPreview); setVideoPreview(null); }
         if (imagePreview) { URL.revokeObjectURL(imagePreview); setImagePreview(null); }
         if (videoInputRef.current) videoInputRef.current.value = '';
@@ -164,7 +176,7 @@ export function JobCreateForm({ onCreated, onError, onUploaded, className }: Job
       onCreated(createdStatus);
       setVideoFile(null);
       setRefImageFile(null);
-      setPlacementPrompt('');
+      setPlacementPrompt(normalizedDefaultPrompt);
       if (videoPreview) { URL.revokeObjectURL(videoPreview); setVideoPreview(null); }
       if (imagePreview) { URL.revokeObjectURL(imagePreview); setImagePreview(null); }
       if (videoInputRef.current) videoInputRef.current.value = '';
