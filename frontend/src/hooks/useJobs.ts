@@ -7,6 +7,11 @@ import {
   initSession,
   selectPreview,
 } from '../services/api';
+import { downloadBlobFromUrl } from '../services/download';
+import {
+  buildDownloadFileName,
+  readWorkspaceSettings,
+} from '../services/workspaceSettings';
 import { subscribeJobProgress, WsJobProgress } from '../services/ws';
 import type { JobItem, JobStatusResponse, JobType, PreviewItem } from '../services/types';
 
@@ -184,16 +189,12 @@ export function useJobs() {
   const downloadResult = async (jobId: string) => {
     try {
       const result = await getJobResult(jobId);
-      const resp = await fetch(result.download.url);
-      const blob = await resp.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `${jobId}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
+      const settings = readWorkspaceSettings();
+      const filename = buildDownloadFileName(
+        jobId,
+        settings.download.filenamePattern
+      );
+      await downloadBlobFromUrl(result.download.url, filename);
     } catch {
       setErrorMessage('다운로드에 실패했습니다.');
     }

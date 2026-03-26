@@ -5,6 +5,11 @@ import { PreviewSelectModal } from '../components/studio/PreviewSelectModal';
 import { JobStagePanel } from '../components/studio/JobStagePanel';
 import { useJobs } from '../hooks/useJobs';
 import { formatStage } from '../constants/stage';
+import {
+  DEFAULT_WORKSPACE_SETTINGS,
+  useWorkspaceSettings,
+  type WorkspaceSettings,
+} from '../services/workspaceSettings';
 import type { JobItem, JobStatusResponse } from '../services/types';
 
 /* ── Status config ── */
@@ -254,11 +259,12 @@ function WorkspaceTopBar({ activeSection, onCreateJob }: {
   );
 }
 
-function WorkspaceSidebar({ activeSection, onSelect, onCreateJob, onOpenHelp, counts }: {
+function WorkspaceSidebar({ activeSection, onSelect, onCreateJob, onOpenHelp, onOpenSettings, counts }: {
   activeSection: WorkspaceSection;
   onSelect: (next: WorkspaceSection) => void;
   onCreateJob: () => void;
   onOpenHelp: () => void;
+  onOpenSettings: () => void;
   counts: Record<WorkspaceSection, number>;
 }) {
   return (
@@ -299,7 +305,7 @@ function WorkspaceSidebar({ activeSection, onSelect, onCreateJob, onOpenHelp, co
 
       <div className="workspace-sidebar-block">
         <p className="workspace-sidebar-title">설정</p>
-        <button type="button" className="workspace-sidebar-subitem">
+        <button type="button" className="workspace-sidebar-subitem" onClick={onOpenSettings}>
           <SidebarGearIcon />
           <span>설정</span>
         </button>
@@ -416,6 +422,302 @@ function WorkspaceGuideModal({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           </section> */}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function WorkspaceSettingSwitch({
+  label,
+  description,
+  enabled,
+  disabled = false,
+  onToggle,
+}: {
+  label: string;
+  description: string;
+  enabled: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="workspace-settings-switch-row">
+      <div className="workspace-settings-switch-copy">
+        <strong>{label}</strong>
+        <p>{description}</p>
+      </div>
+      <button
+        type="button"
+        className={`workspace-settings-switch ${enabled ? 'on' : ''}`}
+        aria-pressed={enabled}
+        disabled={disabled}
+        onClick={onToggle}
+      >
+        <span />
+      </button>
+    </div>
+  );
+}
+
+function WorkspaceSettingsModal({
+  settings,
+  onPatchSettings,
+  onResetSettings,
+  onClose,
+}: {
+  settings: WorkspaceSettings;
+  onPatchSettings: (updater: (current: WorkspaceSettings) => WorkspaceSettings) => void;
+  onResetSettings: () => void;
+  onClose: () => void;
+}) {
+  const [browserPermission, setBrowserPermission] = useState<NotificationPermission | 'unsupported'>(() => {
+    if (typeof Notification === 'undefined') {
+      return 'unsupported';
+    }
+    return Notification.permission;
+  });
+
+  useEffect(() => {
+    const syncPermission = () => {
+      if (typeof Notification === 'undefined') {
+        setBrowserPermission('unsupported');
+        return;
+      }
+      setBrowserPermission(Notification.permission);
+    };
+
+    syncPermission();
+    window.addEventListener('focus', syncPermission);
+    return () => window.removeEventListener('focus', syncPermission);
+  }, []);
+
+  useEffect(() => {
+    if (browserPermission === 'granted') {
+      return;
+    }
+
+    if (!settings.notifications.browserEnabled) {
+      return;
+    }
+
+    onPatchSettings((current) => ({
+      ...current,
+      notifications: {
+        ...current.notifications,
+        browserEnabled: false,
+      },
+    }));
+  }, [browserPermission, onPatchSettings, settings.notifications.browserEnabled]);
+
+  const browserPermissionLabel =
+    browserPermission === 'unsupported'
+      ? '이 브라우저는 웹 알림을 지원하지 않습니다.'
+      : browserPermission === 'granted'
+        ? '브라우저 알림 권한이 허용되어 있습니다.'
+        : browserPermission === 'denied'
+          ? '브라우저 알림 권한이 차단되어 있습니다.'
+          : '브라우저 알림 권한 요청이 필요합니다.';
+
+  const requestBrowserPermission = async () => {
+    if (typeof Notification === 'undefined') {
+      setBrowserPermission('unsupported');
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setBrowserPermission(permission);
+      if (permission !== 'granted') {
+        onPatchSettings((current) => ({
+          ...current,
+          notifications: {
+            ...current.notifications,
+            browserEnabled: false,
+          },
+        }));
+      }
+    } catch {
+      setBrowserPermission(Notification.permission);
+    }
+  };
+
+  const toggleBrowserNotification = async () => {
+    if (settings.notifications.browserEnabled) {
+      onPatchSettings((current) => ({
+        ...current,
+        notifications: {
+          ...current.notifications,
+          browserEnabled: false,
+        },
+      }));
+      return;
+    }
+
+    if (browserPermission === 'unsupported') {
+      return;
+    }
+
+    if (browserPermission !== 'granted') {
+      await requestBrowserPermission();
+    }
+
+    if (
+      typeof Notification !== 'undefined' &&
+      Notification.permission === 'granted'
+    ) {
+      onPatchSettings((current) => ({
+        ...current,
+        notifications: {
+          ...current.notifications,
+          browserEnabled: true,
+        },
+      }));
+    }
+  };
+
+  return (
+    <>
+      <div className="workspace-settings-modal-backdrop" onClick={onClose} />
+      <section
+        className="workspace-settings-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="workspace-settings-title"
+      >
+        <div className="workspace-settings-modal-header">
+          <div>
+            <h2 id="workspace-settings-title">설정</h2>
+            <p>변경 사항은 현재 브라우저에 즉시 저장됩니다.</p>
+          </div>
+          <button type="button" className="workspace-settings-close-btn" onClick={onClose} aria-label="설정 닫기">
+            ×
+          </button>
+        </div>
+
+        <div className="workspace-settings-modal-body">
+          <section className="workspace-settings-section">
+            <h3>알림</h3>
+            <WorkspaceSettingSwitch
+              label="작업 완료 토스트"
+              description="완료 시 우측 하단 토스트를 표시합니다."
+              enabled={settings.notifications.toastEnabled}
+              onToggle={() => {
+                onPatchSettings((current) => ({
+                  ...current,
+                  notifications: {
+                    ...current.notifications,
+                    toastEnabled: !current.notifications.toastEnabled,
+                  },
+                }));
+              }}
+            />
+            <WorkspaceSettingSwitch
+              label="완료 사운드"
+              description="작업 완료 시 짧은 알림음을 재생합니다."
+              enabled={settings.notifications.soundEnabled}
+              onToggle={() => {
+                onPatchSettings((current) => ({
+                  ...current,
+                  notifications: {
+                    ...current.notifications,
+                    soundEnabled: !current.notifications.soundEnabled,
+                  },
+                }));
+              }}
+            />
+            <WorkspaceSettingSwitch
+              label="브라우저 알림"
+              description="다른 탭/화면에 있어도 브라우저 알림을 수신합니다."
+              enabled={settings.notifications.browserEnabled}
+              disabled={browserPermission === 'unsupported'}
+              onToggle={() => {
+                void toggleBrowserNotification();
+              }}
+            />
+            <div className="workspace-settings-help-row">
+              <span>{browserPermissionLabel}</span>
+              <button
+                type="button"
+                className="workspace-settings-secondary-btn"
+                onClick={() => {
+                  void requestBrowserPermission();
+                }}
+                disabled={browserPermission === 'unsupported' || browserPermission === 'granted'}
+              >
+                권한 요청
+              </button>
+            </div>
+          </section>
+
+          <section className="workspace-settings-section">
+            <h3>다운로드</h3>
+            <div className="workspace-settings-radio-group">
+              <label className="workspace-settings-radio">
+                <input
+                  type="radio"
+                  name="download-filename-pattern"
+                  checked={settings.download.filenamePattern === 'job-id'}
+                  onChange={() => {
+                    onPatchSettings((current) => ({
+                      ...current,
+                      download: {
+                        ...current.download,
+                        filenamePattern: 'job-id',
+                      },
+                    }));
+                  }}
+                />
+                <span>기본: 작업ID.mp4</span>
+              </label>
+              <label className="workspace-settings-radio">
+                <input
+                  type="radio"
+                  name="download-filename-pattern"
+                  checked={settings.download.filenamePattern === 'job-id-timestamp'}
+                  onChange={() => {
+                    onPatchSettings((current) => ({
+                      ...current,
+                      download: {
+                        ...current.download,
+                        filenamePattern: 'job-id-timestamp',
+                      },
+                    }));
+                  }}
+                />
+                <span>작업ID_시간.mp4</span>
+              </label>
+            </div>
+          </section>
+
+          <section className="workspace-settings-section">
+            <h3>작업 기본값</h3>
+            <p className="workspace-settings-field-label">새 작업 모달 기본 프롬프트</p>
+            <textarea
+              className="workspace-settings-textarea"
+              value={settings.defaults.placementPrompt}
+              onChange={(event) => {
+                onPatchSettings((current) => ({
+                  ...current,
+                  defaults: {
+                    ...current.defaults,
+                    placementPrompt: event.target.value,
+                  },
+                }));
+              }}
+              rows={4}
+              placeholder="예: 테이블 오른쪽 위 컵 옆에 배치하고, 바닥 그림자가 자연스럽게 이어지도록"
+            />
+          </section>
+        </div>
+
+        <div className="workspace-settings-modal-footer">
+          <button type="button" className="workspace-settings-secondary-btn" onClick={onResetSettings}>
+            기본값으로 초기화
+          </button>
+          <button type="button" className="workspace-settings-primary-btn" onClick={onClose}>
+            닫기
+          </button>
         </div>
       </section>
     </>
@@ -669,6 +971,7 @@ function WorkspaceHistoryView({
 }
 
 export function WorkspacePage() {
+  const { settings, patchSettings } = useWorkspaceSettings();
   const {
     jobs,
     loadingJobs,
@@ -688,6 +991,7 @@ export function WorkspacePage() {
   const [tab, setTab] = useState<Tab>('all');
   const [historyTab, setHistoryTab] = useState<Tab>('all');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [guideModalOpen, setGuideModalOpen] = useState(false);
   const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
@@ -765,19 +1069,28 @@ export function WorkspacePage() {
   };
 
   useEffect(() => {
-    if (!guideModalOpen) {
+    if (!guideModalOpen && !settingsModalOpen) {
       return undefined;
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      if (settingsModalOpen) {
+        setSettingsModalOpen(false);
+        return;
+      }
+
+      if (guideModalOpen) {
         setGuideModalOpen(false);
       }
     };
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [guideModalOpen]);
+  }, [guideModalOpen, settingsModalOpen]);
 
   return (
     <div className="workspace-shell">
@@ -789,6 +1102,7 @@ export function WorkspacePage() {
           onSelect={setActiveSection}
           onCreateJob={openCreateModal}
           onOpenHelp={() => setGuideModalOpen(true)}
+          onOpenSettings={() => setSettingsModalOpen(true)}
           counts={sidebarCounts}
         />
 
@@ -837,7 +1151,12 @@ export function WorkspacePage() {
               </button>
             </div>
             <div className="workspace-create-modal-body">
-              <JobCreateForm className="p-5" onCreated={handleCreatedJob} onError={setErrorMessage} />
+              <JobCreateForm
+                className="p-5"
+                defaultPlacementPrompt={settings.defaults.placementPrompt}
+                onCreated={handleCreatedJob}
+                onError={setErrorMessage}
+              />
             </div>
             {errorMessage && (
               <div className="workspace-create-modal-error">
@@ -849,6 +1168,17 @@ export function WorkspacePage() {
             )}
           </div>
         </>
+      )}
+
+      {settingsModalOpen && (
+        <WorkspaceSettingsModal
+          settings={settings}
+          onPatchSettings={patchSettings}
+          onResetSettings={() => {
+            patchSettings(() => DEFAULT_WORKSPACE_SETTINGS);
+          }}
+          onClose={() => setSettingsModalOpen(false)}
+        />
       )}
 
       {guideModalOpen && <WorkspaceGuideModal onClose={() => setGuideModalOpen(false)} />}
