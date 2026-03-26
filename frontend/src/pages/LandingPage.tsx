@@ -459,7 +459,7 @@ export function LandingPage() {
 
           <div className="border-t border-zinc-900 pt-7 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-zinc-600">
             <span>© 2025 VPPL Inc. All rights reserved.</span>
-            <span>삼성 청년 SW 아카데미 S14 · A401팀</span>
+            <span>삼성 청년 SW·AI 아카데미 S14 · A401팀</span>
           </div>
         </div>
       </footer>
