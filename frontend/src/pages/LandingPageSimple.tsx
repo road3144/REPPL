@@ -39,7 +39,7 @@ export function LandingPageSimple() {
       {/* Logo — top-left overlay */}
       <div style={{ position: 'absolute', top: 28, left: 48, zIndex: 10 }}>
         <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 900, letterSpacing: '-0.5px', color: '#fff' }}>
-          Re:<span style={{ color: '#4a6cf7' }}>PPL</span>
+          Re<span style={{ color: '#4a6cf7' }}>PPL</span>
         </span>
       </div>
 
@@ -82,7 +82,7 @@ export function LandingPageSimple() {
         textShadow: '0 1px 8px rgba(0,0,0,0.45)',
         borderTop: '1px solid rgba(255,255,255,0.08)',
       }}>
-        © 2025 RE:PPL · 삼성 청년 SW 아카데미 S14 · A401팀
+        © 2026 RePPL · 삼성 청년 SW 아카데미 14기 · A401팀
       </footer>
     </div>
   );
