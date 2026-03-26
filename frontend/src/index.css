@@ -576,6 +576,7 @@ h6 {
 }
 
 @media (min-width: 768px) {
+
   .glass-card,
   .light-slide-card {
     padding: 2rem;
@@ -816,6 +817,8 @@ h6 {
 }
 
 .workspace-topbar-logo {
+  display: inline-flex;
+  align-items: center;
   font-family: 'Space Grotesk', sans-serif;
   font-size: 1.35rem;
   font-weight: 900;
@@ -823,6 +826,7 @@ h6 {
   color: #0f172a;
   text-decoration: none;
   line-height: 1;
+  transform: translateY(10px);
   flex-shrink: 0;
 }
 
@@ -2106,18 +2110,37 @@ h6 {
 
 /* ── Toast slide-up ── */
 @keyframes slideUpToast {
-  from { transform: translateY(16px); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 /* ── Toast auto-dismiss progress bar ── */
 @keyframes shrinkBar {
-  from { width: 100%; }
-  to   { width: 0%; }
+  from {
+    width: 100%;
+  }
+
+  to {
+    width: 0%;
+  }
 }
 
 /* ── Candidate drawer slide-in from right ── */
 @keyframes slideInDrawer {
-  from { transform: translateX(48px); opacity: 0; }
-  to   { transform: translateX(0);    opacity: 1; }
+  from {
+    transform: translateX(48px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
