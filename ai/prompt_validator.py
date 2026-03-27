@@ -33,9 +33,16 @@ _VALIDATION_PROMPT = """당신은 영상 PPL(Product Placement) AI 시스템의 
 - 제품 배치와 무관한 텍스트
 
 다음 프롬프트가 영상 속 제품 배치 요청으로 유효한지 판단하세요.
+
+추가 작업: 프롬프트가 유효하면, 프롬프트에서 배치할 **제품/객체**가 무엇인지 파악하고,
+Grounding DINO 객체 검출 모델이 인식할 수 있는 **영어 키워드**로 변환하세요.
+- 구체적이고 시각적으로 명확한 영어 단어/구문을 사용하세요.
+- 예: 콜라 → "coca cola can", 맥주 → "beer can", 물병 → "water bottle", 커피 → "coffee cup", 꽃병 → "vase"
+- 제품명이 명시되지 않은 경우 "object"로 설정하세요.
+
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요.
 
-유효: {"valid": true}
+유효: {"valid": true, "dino_keyword": "english keyword for object detection"}
 무효: {"valid": false, "reason": "무효한 이유를 한국어로 간단히"}
 
 사용자 프롬프트: "{prompt}"
@@ -52,10 +59,13 @@ class InvalidPromptError(Exception):
 
 def validate_prompt(user_prompt: str):
     """
-    GMS Gemini Flash로 프롬프트를 검증한다.
+    GMS Gemini Flash로 프롬프트를 검증하고, DINO용 영어 키워드를 추출한다.
 
     Args:
         user_prompt: 사용자 입력 프롬프트
+
+    Returns:
+        str or None: DINO용 영어 키워드 (GMS 미설정 시 None)
 
     Raises:
         InvalidPromptError: 프롬프트가 유효하지 않을 때
@@ -65,7 +75,7 @@ def validate_prompt(user_prompt: str):
 
     if not GMS_API_KEY:
         log.warning("GMS_API_KEY 미설정 — 프롬프트 검증 건너뜀")
-        return
+        return None
 
     prompt_text = _VALIDATION_PROMPT.replace("{prompt}", user_prompt)
 
@@ -107,7 +117,9 @@ def validate_prompt(user_prompt: str):
             reason = parsed.get("reason", "제품 배치와 관련된 프롬프트를 입력해주세요.")
             raise InvalidPromptError(reason)
 
-        log.info(f"프롬프트 검증 통과: '{user_prompt[:30]}...'")
+        dino_keyword = parsed.get("dino_keyword", None)
+        log.info(f"프롬프트 검증 통과: '{user_prompt[:30]}...' | DINO 키워드: '{dino_keyword}'")
+        return dino_keyword
 
     except InvalidPromptError:
         raise
