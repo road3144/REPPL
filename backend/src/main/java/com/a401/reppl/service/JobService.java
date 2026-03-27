@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -208,8 +209,13 @@ public class JobService {
         Instant now = Instant.now();
 
         Map<String, Object> options = previewState.getOptionsJson() != null
-                ? fromJson(previewState.getOptionsJson(), Map.class)
-                : Map.of();
+                ? new HashMap<>(fromJson(previewState.getOptionsJson(), Map.class))
+                : new HashMap<>();
+
+        // 프리뷰에서 GMS가 추출한 DINO 키워드를 합성 옵션에 전달
+        if (previewState.getDinoKeyword() != null) {
+            options.put("dinoKeyword", previewState.getDinoKeyword());
+        }
 
         JobState compositeState = JobState.builder()
                 .jobId(compositeJobId)

@@ -92,7 +92,7 @@ public class JobRedisRepository {
     /**
      * 프리뷰 Job 완료 처리 (프리뷰 이미지 키 저장)
      */
-    public void completePreviewJob(String jobId, List<String> previewKeys) {
+    public void completePreviewJob(String jobId, List<String> previewKeys, String dinoKeyword) {
         String key = JobKeys.jobState(jobId);
         Map<String, String> updates = new HashMap<>();
         updates.put("status", JobStatus.COMPLETED.name());
@@ -101,6 +101,9 @@ public class JobRedisRepository {
             updates.put("previewKeys", objectMapper.writeValueAsString(previewKeys));
         } catch (JsonProcessingException e) {
             updates.put("previewKeys", "[]");
+        }
+        if (dinoKeyword != null) {
+            updates.put("dinoKeyword", dinoKeyword);
         }
         updates.put("updatedAt", Instant.now().toString());
 
@@ -160,6 +163,7 @@ public class JobRedisRepository {
                 hash.put("previewKeys", objectMapper.writeValueAsString(state.getPreviewKeys()));
             } catch (JsonProcessingException ignored) {}
         }
+        if (state.getDinoKeyword() != null) hash.put("dinoKeyword", state.getDinoKeyword());
         if (state.getResultKey() != null) hash.put("resultKey", state.getResultKey());
         if (state.getRoiJson() != null) hash.put("roiJson", state.getRoiJson());
         if (state.getOptionsJson() != null) hash.put("optionsJson", state.getOptionsJson());
@@ -180,6 +184,7 @@ public class JobRedisRepository {
         val = str(entries, "stage");       if (val != null) builder.stage(JobStage.valueOf(val));
         val = str(entries, "message");     if (val != null) builder.message(val);
         val = str(entries, "videoKey");    if (val != null) builder.videoKey(val);
+        val = str(entries, "dinoKeyword"); if (val != null) builder.dinoKeyword(val);
         val = str(entries, "resultKey");   if (val != null) builder.resultKey(val);
         val = str(entries, "roiJson");     if (val != null) builder.roiJson(val);
         val = str(entries, "optionsJson"); if (val != null) builder.optionsJson(val);

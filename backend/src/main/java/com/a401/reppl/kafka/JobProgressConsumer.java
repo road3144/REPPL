@@ -36,8 +36,8 @@ public class JobProgressConsumer {
         switch (status) {
             case COMPLETED -> {
                 if (event.getPreviewKeys() != null && !event.getPreviewKeys().isEmpty()) {
-                    // 프리뷰 Job 완료
-                    jobRedisRepository.completePreviewJob(jobId, event.getPreviewKeys());
+                    // 프리뷰 Job 완료 (dinoKeyword 포함)
+                    jobRedisRepository.completePreviewJob(jobId, event.getPreviewKeys(), event.getDinoKeyword());
                     webSocketPushService.pushJobProgress(jobId, status, 100,
                             event.getStage(), event.getMessage(), event.getPreviewKeys());
                 } else {
