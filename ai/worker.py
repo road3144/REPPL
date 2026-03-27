@@ -91,9 +91,10 @@ def process_preview(event: dict, producer: KafkaProgressProducer):
 
     log.info(f"=== 프리뷰 Job 시작: {job_id} ===")
 
-    # ── 프롬프트 검증 ──
+    # ── 프롬프트 검증 + DINO 키워드 추출 ──
+    dino_keyword = None
     try:
-        validate_prompt(prompt)
+        dino_keyword = validate_prompt(prompt)
     except InvalidPromptError as e:
         log.warning(f"프롬프트 검증 실패: {job_id} — {e.reason}")
         producer.send_progress(
@@ -108,6 +109,8 @@ def process_preview(event: dict, producer: KafkaProgressProducer):
             "프롬프트 검증 서버에 문제가 발생했습니다. 잠시 후 다시 시도해주세요."
         )
         return
+    if dino_keyword:
+        log.info(f"GMS DINO 키워드: '{dino_keyword}'")
 
     local_files = [video_local]
     if img_local:
@@ -134,6 +137,7 @@ def process_preview(event: dict, producer: KafkaProgressProducer):
             user_prompt=prompt,
             count=3,
             on_progress=on_progress,
+            dino_keyword=dino_keyword,
         )
 
         # ── S3 업로드 ──
@@ -203,6 +207,7 @@ def process_composite(event: dict, producer: KafkaProgressProducer):
             user_prompt=prompt,
             output_path=output_local,
             on_progress=on_progress,
+            dino_keyword=options.get("dinoKeyword"),
         )
 
         # ── ENCODE (H.264 + faststart) ──
