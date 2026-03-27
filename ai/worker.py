@@ -184,6 +184,15 @@ def process_composite(event: dict, producer: KafkaProgressProducer):
 
     prompt = options.get("placementPrompt", "object")
 
+    # ── DINO 키워드: 백엔드에서 전달받거나, GMS로 추출 ──
+    dino_kw = options.get("dinoKeyword")
+    if not dino_kw:
+        try:
+            dino_kw = validate_prompt(prompt)
+            log.info(f"합성 Job GMS DINO 키워드: '{dino_kw}'")
+        except (InvalidPromptError, RuntimeError):
+            pass  # 프리뷰에서 이미 검증됨, 키워드 추출 실패 시 폴백
+
     video_local = os.path.join(INPUTS, os.path.basename(video_s3["key"]))
     preview_local = os.path.join(INPUTS, f"{job_id}_selected_preview.png")
     output_local = os.path.join(OUTPUTS, f"{job_id}_output.mp4")
@@ -207,7 +216,7 @@ def process_composite(event: dict, producer: KafkaProgressProducer):
             user_prompt=prompt,
             output_path=output_local,
             on_progress=on_progress,
-            dino_keyword=options.get("dinoKeyword"),
+            dino_keyword=dino_kw,
         )
 
         # ── ENCODE (H.264 + faststart) ──
