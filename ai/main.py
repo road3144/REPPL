@@ -1305,7 +1305,7 @@ def _call_gemini_once(first_pil, obj_pil, kw, w1, h1, user_prompt="", quality_de
     raise RuntimeError("Gemini API 5회 실패")
 
 
-def generate_previews(video_path, obj_img_path, user_prompt, count=3, on_progress=None):
+def generate_previews(video_path, obj_img_path, user_prompt, count=3, on_progress=None, dino_keyword=None):
     """
     Gemini를 count회 호출하여 프리뷰 이미지 리스트를 반환한다.
 
@@ -1315,6 +1315,7 @@ def generate_previews(video_path, obj_img_path, user_prompt, count=3, on_progres
         user_prompt: 사용자 프롬프트
         count: 생성할 프리뷰 개수 (기본 3)
         on_progress: 진행률 콜백 (stage, percent, message)
+        dino_keyword: GMS에서 추출한 DINO용 영어 키워드 (None이면 기존 사전 폴백)
 
     Returns:
         list[str]: 저장된 프리뷰 이미지 경로 리스트
@@ -1326,8 +1327,12 @@ def generate_previews(video_path, obj_img_path, user_prompt, count=3, on_progres
     if gemini_client is None:
         raise RuntimeError("Gemini API 미설정")
 
-    # 키워드 추출
-    _, _, kw = step2_auto_detect(user_prompt)
+    # 키워드: GMS 추출 우선, 없으면 기존 사전 폴백
+    if dino_keyword:
+        kw = dino_keyword
+        log.info(f"DINO 키워드 (GMS): '{kw}'")
+    else:
+        _, _, kw = step2_auto_detect(user_prompt)
 
     # 첫 프레임 추출
     cap = cv2.VideoCapture(video_path)
@@ -1361,7 +1366,7 @@ def generate_previews(video_path, obj_img_path, user_prompt, count=3, on_progres
     return preview_paths
 
 
-def run_composite(video_path, selected_preview_path, user_prompt, output_path, on_progress=None):
+def run_composite(video_path, selected_preview_path, user_prompt, output_path, on_progress=None, dino_keyword=None):
     """
     선택된 프리뷰 이미지를 기반으로 합성 파이프라인을 실행한다.
 
@@ -1371,13 +1376,18 @@ def run_composite(video_path, selected_preview_path, user_prompt, output_path, o
         user_prompt: 사용자 프롬프트
         output_path: 결과 영상 저장 경로
         on_progress: 진행률 콜백 (stage, percent, message)
+        dino_keyword: GMS에서 추출한 DINO용 영어 키워드 (None이면 기존 사전 폴백)
     """
     def _p(stage, percent, message):
         if on_progress:
             on_progress(stage, percent, message)
 
-    # 키워드 추출
-    _, _, kw = step2_auto_detect(user_prompt)
+    # 키워드: GMS 추출 우선, 없으면 기존 사전 폴백
+    if dino_keyword:
+        kw = dino_keyword
+        log.info(f"DINO 키워드 (GMS): '{kw}'")
+    else:
+        _, _, kw = step2_auto_detect(user_prompt)
 
     # 첫 프레임 + 선택된 프리뷰 이미지 로드
     cap = cv2.VideoCapture(video_path)
