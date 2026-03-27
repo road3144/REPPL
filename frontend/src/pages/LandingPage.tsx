@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useScrollReveal } from '../hooks/useScrollReveal';
 
 /* ─── smooth scroll helper ─── */
@@ -110,14 +111,30 @@ const TARGETS = [
 /* ─── component ─── */
 export function LandingPage() {
   const pageRef = useScrollReveal<HTMLDivElement>();
+  const navigate = useNavigate();
+  const [demoUnlocked, setDemoUnlocked] = useState(false);
+
+  const handleServiceClick = () => {
+    if (demoUnlocked) {
+      navigate('/studio');
+    } else {
+      alert('현재 시연중이므로 사용할 수 없습니다.');
+    }
+  };
 
   return (
     <div ref={pageRef} className="bg-white text-slate-900">
 
       {/* ══════════ NAV ══════════ */}
       <header className="fixed top-0 inset-x-0 z-50 h-[70px] bg-white/95 backdrop-blur-sm border-b border-slate-200 flex items-center justify-between px-10 lg:px-16">
-        <div className="text-xl font-black tracking-tight">
+        <div className="relative text-xl font-black tracking-tight">
           VP<span className="text-brand">PL</span>
+          <button
+            type="button"
+            onDoubleClick={() => setDemoUnlocked(true)}
+            className="absolute inset-0 opacity-0 cursor-default"
+            aria-hidden="true"
+          />
         </div>
 
         <nav className="hidden md:flex items-center gap-8">
@@ -133,12 +150,13 @@ export function LandingPage() {
           ))}
         </nav>
 
-        <Link
-          to="/studio"
+        <button
+          type="button"
+          onClick={handleServiceClick}
           className="bg-slate-900 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-slate-700 transition-colors"
         >
           서비스 바로가기 →
-        </Link>
+        </button>
       </header>
 
       {/* ══════════ HERO ══════════ */}

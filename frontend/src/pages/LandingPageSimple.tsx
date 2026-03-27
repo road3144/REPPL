@@ -1,6 +1,18 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export function LandingPageSimple() {
+  const navigate = useNavigate();
+  const [demoUnlocked, setDemoUnlocked] = useState(false);
+
+  const handleServiceClick = () => {
+    if (demoUnlocked) {
+      navigate('/studio');
+    } else {
+      alert('현재 시연중이므로 사용할 수 없습니다.');
+    }
+  };
+
   return (
     <div style={{ position: 'relative', height: '100vh', overflow: 'hidden', background: '#09090b' }}>
 
@@ -41,6 +53,13 @@ export function LandingPageSimple() {
         <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 900, letterSpacing: '-0.5px', color: '#fff' }}>
           Re<span style={{ color: '#4a6cf7' }}>PPL</span>
         </span>
+        {/* 발표용 잠금 해제 버튼 (투명, 로고 위 오버레이) */}
+        <button
+          type="button"
+          onDoubleClick={() => setDemoUnlocked(true)}
+          style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'default' }}
+          aria-hidden="true"
+        />
       </div>
 
       {/* Top-right CTA */}
@@ -52,8 +71,9 @@ export function LandingPageSimple() {
         display: 'flex',
         alignItems: 'center',
       }}>
-        <Link
-          to="/studio"
+        <button
+          type="button"
+          onClick={handleServiceClick}
           style={{
             display: 'inline-block',
             padding: '11px 20px',
@@ -65,13 +85,13 @@ export function LandingPageSimple() {
             fontWeight: 700,
             letterSpacing: '-0.2px',
             lineHeight: 1.2,
-            textDecoration: 'none',
+            cursor: 'pointer',
             backdropFilter: 'blur(10px)',
             boxShadow: '0 10px 30px rgba(0,0,0,0.28)',
           }}
         >
           서비스 바로가기 →
-        </Link>
+        </button>
       </div>
 
       {/* Footer overlay */}
