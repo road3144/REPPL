@@ -40,7 +40,7 @@ const GUIDE_QUICK_STEPS = [
   },
   {
     title: '제품 이미지 등록',
-    description: '배경이 깔끔한 PNG/JPG를 최대 5장까지 업로드해 다양한 후보를 만드세요.',
+    description: '배경이 깔끔한 PNG/JPG를 1장 업로드하세요.',
   },
   {
     title: '배치 프롬프트 작성',
@@ -48,7 +48,7 @@ const GUIDE_QUICK_STEPS = [
   },
   {
     title: '프리뷰 선택 후 합성',
-    description: '프리뷰 4개 중 가장 자연스러운 결과를 선택한 뒤 최종 합성을 실행하세요.',
+    description: '생성된 프리뷰 중 가장 자연스러운 결과를 선택한 뒤 최종 합성을 실행하세요.',
   },
 ] as const;
 
@@ -290,7 +290,6 @@ function WorkspaceGuideModal({ onClose }: { onClose: () => void }) {
             <div className="workspace-guide-badge-row">
               <span className="workspace-guide-badge">정확한 위치 지시</span>
               <span className="workspace-guide-badge">프리뷰 기반 선택</span>
-              <span className="workspace-guide-badge">완료 토스트 실시간 확인</span>
             </div>
           </section>
 
