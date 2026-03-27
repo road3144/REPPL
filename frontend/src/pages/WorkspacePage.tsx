@@ -1337,12 +1337,17 @@ function JobCard({ job, selected, onSelect, onDownload, onPlay, onSelectPreview 
           </div>
         )}
         {(job.status === 'RUNNING' || job.status === 'COMPLETED') && (
-          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ marginTop: 6 }}>
             {job.status === 'RUNNING' && (
-              <img src="/images/robotboxgif.gif" alt="" style={{ height: 28, width: 'auto', flexShrink: 0 }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', display: 'block', marginBottom: 3 }}>{progress}%</span>
             )}
-            <div className="job-progress-track" style={{ flex: 1 }}>
-              <div className={`job-progress-fill ${cfg.progressCls}`} style={{ width: `${progress}%` }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className="job-progress-track" style={{ flex: 1 }}>
+                <div className={`job-progress-fill ${cfg.progressCls}`} style={{ width: `${progress}%` }} />
+              </div>
+              {job.status === 'RUNNING' && (
+                <img src="/images/robotboxgif.gif" alt="" style={{ height: 28, width: 'auto', flexShrink: 0 }} />
+              )}
             </div>
           </div>
         )}
@@ -1350,7 +1355,6 @@ function JobCard({ job, selected, onSelect, onDownload, onPlay, onSelectPreview 
 
       <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
         <span className={`job-status-badge ${cfg.badgeCls}`}>{cfg.label}</span>
-        {job.status === 'RUNNING' && <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>{progress}%</span>}
         {isPreviewCompleted && (
           <button
             className="download-btn"
