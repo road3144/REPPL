@@ -1947,7 +1947,7 @@ h6 {
 
 /* ── Job Progress Bar ── */
 .job-progress-track {
-  height: 4px;
+  height: 8px;
   border-radius: 9999px;
   background: rgba(226, 232, 240, 0.85);
   overflow: hidden;
@@ -1964,7 +1964,20 @@ h6 {
 }
 
 .job-progress-amber {
-  background: linear-gradient(90deg, rgba(251, 191, 36, 0.5), var(--amber));
+  background: repeating-linear-gradient(
+    -45deg,
+    #4a6cf7,
+    #4a6cf7 8px,
+    #7a9cff 8px,
+    #7a9cff 16px
+  );
+  background-size: 22px 22px;
+  animation: barber-pole 0.6s linear infinite;
+}
+
+@keyframes barber-pole {
+  from { background-position: 0 0; }
+  to   { background-position: 22px 0; }
 }
 
 .job-progress-emerald {
