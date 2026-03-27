@@ -1337,8 +1337,11 @@ function JobCard({ job, selected, onSelect, onDownload, onPlay, onSelectPreview 
           </div>
         )}
         {(job.status === 'RUNNING' || job.status === 'COMPLETED') && (
-          <div style={{ marginTop: 6 }}>
-            <div className="job-progress-track">
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {job.status === 'RUNNING' && (
+              <img src="/images/robotboxgif.gif" alt="" style={{ height: 28, width: 'auto', flexShrink: 0 }} />
+            )}
+            <div className="job-progress-track" style={{ flex: 1 }}>
               <div className={`job-progress-fill ${cfg.progressCls}`} style={{ width: `${progress}%` }} />
             </div>
           </div>
