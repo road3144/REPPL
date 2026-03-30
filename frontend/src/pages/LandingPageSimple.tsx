@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 export function LandingPageSimple() {
   const navigate = useNavigate();
-  const [demoUnlocked, setDemoUnlocked] = useState(false);
+  const [demoUnlocked, setDemoUnlocked] = useState(true);
 
   const handleServiceClick = () => {
     if (demoUnlocked) {
