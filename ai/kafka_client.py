@@ -72,6 +72,7 @@ class KafkaProgressProducer:
         message: str,
         output_key: str = None,
         preview_keys: list = None,
+        dino_keyword: str = None,
     ):
         self._seq += 1
         event = {
@@ -85,6 +86,7 @@ class KafkaProgressProducer:
             "seq": self._seq,
             "outputKey": output_key,
             "previewKeys": preview_keys,
+            "dinoKeyword": dino_keyword,
         }
         self._producer.send(KAFKA_TOPIC_JOB_PROGRESS, key=job_id, value=event)
         self._producer.flush()

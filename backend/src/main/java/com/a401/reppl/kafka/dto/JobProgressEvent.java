@@ -28,4 +28,7 @@ public class JobProgressEvent {
 
     /** 프리뷰 Job 완료 시 생성된 프리뷰 이미지 S3 key 목록 */
     private List<String> previewKeys;
+
+    /** GMS가 추출한 DINO 객체 검출용 영어 키워드 */
+    private String dinoKeyword;
 }

@@ -66,7 +66,7 @@ class JobProgressConsumerTest {
 
         consumer.consume(message);
 
-        verify(jobRedisRepository).completePreviewJob(eq("job-p1"), anyList());
+        verify(jobRedisRepository).completePreviewJob(eq("job-p1"), anyList(), any());
         verify(jobRedisRepository, never()).completeJob(any(), any());
     }
 

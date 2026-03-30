@@ -149,11 +149,12 @@ def process_preview(event: dict, producer: KafkaProgressProducer):
             preview_keys.append(s3_key)
             local_files.append(path)
 
-        # ── COMPLETED (previewKeys 포함) ──
+        # ── COMPLETED (previewKeys + dinoKeyword 포함) ──
         producer.send_progress(
             job_id, "COMPLETED", "UPLOAD", 100,
             "프리뷰 생성 완료",
             preview_keys=preview_keys,
+            dino_keyword=dino_keyword,
         )
         log.info(f"=== 프리뷰 Job 완료: {job_id} ({len(preview_keys)}장) ===")
 
@@ -184,6 +185,11 @@ def process_composite(event: dict, producer: KafkaProgressProducer):
 
     prompt = options.get("placementPrompt", "object")
 
+    # ── DINO 키워드: 백엔드가 프리뷰 완료 시 저장한 값 사용 ──
+    dino_kw = options.get("dinoKeyword")
+    if dino_kw:
+        log.info(f"합성 Job DINO 키워드 (프리뷰에서 전달): '{dino_kw}'")
+
     video_local = os.path.join(INPUTS, os.path.basename(video_s3["key"]))
     preview_local = os.path.join(INPUTS, f"{job_id}_selected_preview.png")
     output_local = os.path.join(OUTPUTS, f"{job_id}_output.mp4")
@@ -207,7 +213,7 @@ def process_composite(event: dict, producer: KafkaProgressProducer):
             user_prompt=prompt,
             output_path=output_local,
             on_progress=on_progress,
-            dino_keyword=options.get("dinoKeyword"),
+            dino_keyword=dino_kw,
         )
 
         # ── ENCODE (H.264 + faststart) ──

@@ -55,6 +55,9 @@ public class JobState {
     // 프리뷰 이미지 (프리뷰 Job 완료 시)
     private List<String> previewKeys;
 
+    // DINO 키워드 (프리뷰 완료 시 GMS가 추출)
+    private String dinoKeyword;
+
     // 결과 파일 (합성 Job 완료 시)
     private String resultKey;
 
