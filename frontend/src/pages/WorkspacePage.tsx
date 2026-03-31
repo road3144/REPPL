@@ -93,11 +93,13 @@ function JobFullPanel({
   onPlay,
   onDownload,
   onLoadPreviews,
+  onClose,
 }: {
   job: TrackedJob;
   onPlay: (id: string) => Promise<void>;
   onDownload: (id: string) => Promise<void>;
   onLoadPreviews: (id: string) => void;
+  onClose: () => void;
 }) {
   const progress = job.progress ?? (job.status === 'COMPLETED' ? 100 : 0);
   const isPreviewCompleted = job.jobType === 'PREVIEW' && job.status === 'COMPLETED';
@@ -157,6 +159,7 @@ function JobFullPanel({
           {job.status === 'RUNNING' && progress > 0 && (
             <span className="job-full-progress-pct">{progress}%</span>
           )}
+          <button type="button" className="job-full-close-btn" onClick={onClose} aria-label="패널 닫기">×</button>
         </div>
       </div>
 
@@ -919,6 +922,7 @@ function WorkspaceStudioView({
   tab,
   onTabChange,
   onSelectJob,
+  onDeselectJob,
   onPlay,
   onDownload,
   onLoadPreviews,
@@ -930,6 +934,7 @@ function WorkspaceStudioView({
   tab: Tab;
   onTabChange: (tab: Tab) => void;
   onSelectJob: (id: string) => void;
+  onDeselectJob: () => void;
   onPlay: (id: string) => Promise<void>;
   onDownload: (id: string) => Promise<void>;
   onLoadPreviews: (id: string) => void;
@@ -997,6 +1002,7 @@ function WorkspaceStudioView({
             onPlay={onPlay}
             onDownload={onDownload}
             onLoadPreviews={onLoadPreviews}
+            onClose={onDeselectJob}
           />
         )}
       </div>
@@ -1064,6 +1070,7 @@ function WorkspaceHistoryView({
   onDownload,
   onSelectPreview,
   totalCount,
+  onOpenInStudio,
 }: {
   filteredJobs: JobItem[];
   tab: Tab;
@@ -1071,6 +1078,7 @@ function WorkspaceHistoryView({
   onDownload: (jobId: string) => Promise<void>;
   onSelectPreview: (id: string) => void;
   totalCount: number;
+  onOpenInStudio: (jobId: string) => void;
 }) {
   return (
     <div className="workspace-view-container">
@@ -1097,7 +1105,7 @@ function WorkspaceHistoryView({
             key={job.jobId}
             job={job}
             selected={false}
-            onSelect={() => { }}
+            onSelect={() => onOpenInStudio(job.jobId)}
             onDownload={onDownload}
             onSelectPreview={onSelectPreview}
           />
@@ -1253,6 +1261,7 @@ export function WorkspacePage() {
               tab={tab}
               onTabChange={setTab}
               onSelectJob={setSelectedJobId}
+              onDeselectJob={() => setSelectedJobId(null)}
               onDownload={downloadResult}
               onPlay={openPlayer}
               onLoadPreviews={loadPreviews}
@@ -1269,6 +1278,10 @@ export function WorkspacePage() {
               onDownload={downloadResult}
               onSelectPreview={loadPreviews}
               totalCount={jobs.length}
+              onOpenInStudio={(jobId) => {
+                setSelectedJobId(jobId);
+                setActiveSection('studio');
+              }}
             />
           )}
         </main>
@@ -1447,7 +1460,13 @@ export function WorkspacePage() {
           jobId={previewSelecting.jobId}
           previews={previewSelecting.previews}
           selecting={selectingIndex}
-          onSelect={(index) => handleSelectPreview(previewSelecting.jobId, index)}
+          onSelect={async (index) => {
+            const compositeJobId = await handleSelectPreview(previewSelecting.jobId, index);
+            if (compositeJobId) {
+              setSelectedJobId(compositeJobId);
+              setActiveSection('studio');
+            }
+          }}
           onClose={closePreviewSelection}
         />
       )}

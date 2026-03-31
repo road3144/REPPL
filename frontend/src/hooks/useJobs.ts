@@ -181,16 +181,18 @@ export function useJobs() {
     }
   };
 
-  // 프리뷰 선택 → 합성 작업 시작
-  const handleSelectPreview = async (previewJobId: string, selectedIndex: number) => {
+  // 프리뷰 선택 → 합성 작업 시작 (compositeJobId 반환)
+  const handleSelectPreview = async (previewJobId: string, selectedIndex: number): Promise<string | null> => {
     try {
       setSelectingIndex(true);
       const result = await selectPreview(previewJobId, selectedIndex);
       const compositeStatus = await getJobStatus(result.compositeJobId);
       prependCreatedJob(compositeStatus);
       setPreviewSelecting(null);
+      return result.compositeJobId;
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : '프리뷰 선택에 실패했습니다.');
+      return null;
     } finally {
       setSelectingIndex(false);
     }
