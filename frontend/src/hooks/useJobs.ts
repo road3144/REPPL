@@ -17,6 +17,7 @@ import type { JobItem, JobStatusResponse, JobType, PreviewItem } from '../servic
 
 export type TrackedJob = JobItem & {
   jobType: JobType;
+  messageLog: string[];
 };
 
 export function useJobs() {
@@ -46,12 +47,19 @@ export function useJobs() {
     setJobs((prev) =>
       prev.map((job) => {
         if (job.jobId !== data.jobId) return job;
+        const newMessage = data.message || null;
+        const prevLog = job.messageLog ?? [];
+        const messageLog =
+          newMessage && newMessage !== prevLog[prevLog.length - 1]
+            ? [...prevLog, newMessage]
+            : prevLog;
         return {
           ...job,
           status: data.status,
           progress: data.progress,
           stage: data.stage ?? null,
-          message: data.message || null,
+          message: newMessage,
+          messageLog,
         };
       })
     );
@@ -70,6 +78,7 @@ export function useJobs() {
           data.items.map((item) => ({
             ...item,
             jobType: item.jobType ?? 'COMPOSITE',
+            messageLog: [],
           }))
         );
       })
@@ -158,6 +167,7 @@ export function useJobs() {
       ...status,
       createdAt: null,
       jobType: status.jobType ?? 'PREVIEW',
+      messageLog: [],
     }, ...prev]);
   };
 
