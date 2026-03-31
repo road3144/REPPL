@@ -23,6 +23,216 @@ const STATUS_CFG: Record<
   FAILED: { label: '실패', badgeCls: 'job-status-rose', progressCls: 'job-progress-rose' },
 };
 
+/* ── Stage flow data (mirrored from JobStagePanel) ── */
+const PREVIEW_STAGE_FLOW = [
+  { key: 'GEMINI', label: '첫 프레임 Gemini 합성' },
+] as const;
+
+const COMPOSITE_STAGE_FLOW = [
+  { key: 'DOWNLOAD', label: '입력 파일 다운로드' },
+  { key: 'DINO', label: 'Grounding DINO 객체 검출' },
+  { key: 'SAM', label: 'SAM 마스크 추출' },
+  { key: 'SHADOW', label: '그림자 생성' },
+  { key: 'SCALE', label: '객체 크기 조정' },
+  { key: 'DEPTH', label: '깊이 추정' },
+  { key: 'COMPOSITE', label: '전체 프레임 합성' },
+  { key: 'UPLOAD', label: '최종 합성 업로드' },
+] as const;
+
+function getStageFlow(job: JobItem) {
+  return job.jobType === 'PREVIEW' ? PREVIEW_STAGE_FLOW : COMPOSITE_STAGE_FLOW;
+}
+
+type StageTone = 'done' | 'current' | 'pending' | 'failed';
+
+function getStageTone(job: JobItem, stageKey: string, stageIndex: number, activeIndex: number): StageTone {
+  if (job.status === 'COMPLETED') return 'done';
+  if (job.status === 'FAILED') {
+    if (activeIndex === -1) return 'pending';
+    if (stageIndex < activeIndex) return 'done';
+    if (stageIndex === activeIndex) return 'failed';
+    return 'pending';
+  }
+  if (job.status === 'RUNNING') {
+    if (activeIndex === -1) return stageIndex === 0 ? 'current' : 'pending';
+    if (stageIndex < activeIndex) return 'done';
+    if (stageIndex === activeIndex) return 'current';
+    return 'pending';
+  }
+  return 'pending';
+}
+
+function FullStageIcon({ tone }: { tone: StageTone }) {
+  if (tone === 'done') {
+    return (
+      <span className="job-full-stage-icon job-full-stage-icon-done">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m5 12 4 4L19 6" />
+        </svg>
+      </span>
+    );
+  }
+  if (tone === 'current') {
+    return <span className="job-full-stage-icon job-full-stage-icon-current" />;
+  }
+  if (tone === 'failed') {
+    return (
+      <span className="job-full-stage-icon job-full-stage-icon-failed">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+          <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+        </svg>
+      </span>
+    );
+  }
+  return <span className="job-full-stage-icon job-full-stage-icon-pending" />;
+}
+
+function JobFullPanel({
+  job,
+  onPlay,
+  onDownload,
+  onLoadPreviews,
+}: {
+  job: JobItem;
+  onPlay: (id: string) => Promise<void>;
+  onDownload: (id: string) => Promise<void>;
+  onLoadPreviews: (id: string) => void;
+}) {
+  const stages = getStageFlow(job);
+  const activeIndex = job.stage ? stages.findIndex((s) => s.key === job.stage) : -1;
+  const progress = job.progress ?? (job.status === 'COMPLETED' ? 100 : 0);
+  const isPreviewCompleted = job.jobType === 'PREVIEW' && job.status === 'COMPLETED';
+  const isCompositeCompleted = job.jobType === 'COMPOSITE' && job.status === 'COMPLETED';
+
+  const progressFillClass =
+    job.status === 'RUNNING' ? 'running' :
+    job.status === 'COMPLETED' ? 'completed' :
+    job.status === 'FAILED' ? 'failed' : 'queued';
+
+  const metaStatusLabel =
+    job.status === 'RUNNING' ? `처리 중${job.progress != null ? ` (${job.progress}%)` : ''}` :
+    job.status === 'QUEUED' ? '대기 중' :
+    job.status === 'COMPLETED' ? '완료' : '실패';
+
+  return (
+    <div className="job-full-panel" key={job.jobId}>
+      {/* Header */}
+      <div className="job-full-header">
+        <div className="job-full-title-group">
+          <h2 className="job-full-title">{job.jobId}</h2>
+          <span className="job-full-type">
+            {job.jobType === 'PREVIEW' ? '프리뷰 생성 작업' : '최종 합성 작업'}
+          </span>
+        </div>
+        <div className="job-full-status-group">
+          <span className={`job-status-badge ${STATUS_CFG[job.status]?.badgeCls ?? ''}`}>
+            {STATUS_CFG[job.status]?.label ?? job.status}
+          </span>
+          {job.status === 'RUNNING' && progress > 0 && (
+            <span className="job-full-progress-pct">{progress}%</span>
+          )}
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="job-full-progress-track">
+        <div
+          className={`job-full-progress-fill ${progressFillClass}`}
+          style={{ width: `${progressFillClass === 'queued' ? 8 : progress}%` }}
+        />
+      </div>
+
+      {/* Body: stage timeline (left) + meta/actions (right) */}
+      <div className="job-full-body">
+        {/* Left: vertical stage timeline */}
+        <div>
+          <h4 className="job-full-section-title">처리 단계</h4>
+          <div className="job-full-stages-vertical">
+            {stages.map((stage, i) => {
+              const tone = getStageTone(job, stage.key, i, activeIndex);
+              return (
+                <div
+                  key={`${stage.key}-${tone}`}
+                  className={`job-full-stage-row job-full-stage-row-${tone}`}
+                >
+                  <div className="job-full-stage-icon-col">
+                    <FullStageIcon tone={tone} />
+                  </div>
+                  <div className="job-full-stage-label-col">
+                    <span className="job-full-stage-row-label">
+                      {stage.label}
+                      {tone === 'current' && job.progress != null ? ` (${job.progress}%)` : ''}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right: meta info + action buttons */}
+        <div className="job-full-side">
+          <div className="job-full-meta-vertical">
+            <div className="job-full-meta-item-sm">
+              <span className="job-full-meta-label-sm">상태</span>
+              <span className={`job-full-meta-value-sm${job.status === 'RUNNING' ? ' running' : ''}`}>
+                {metaStatusLabel}
+              </span>
+            </div>
+            <div className="job-full-meta-item-sm">
+              <span className="job-full-meta-label-sm">생성 시각</span>
+              <span className="job-full-meta-value-sm">
+                {job.createdAt ? new Date(job.createdAt).toLocaleString('ko-KR') : '방금 생성됨'}
+              </span>
+            </div>
+            {job.message && (
+              <div className="job-full-meta-item-sm">
+                <span className="job-full-meta-label-sm">메시지</span>
+                <span className="job-full-meta-value-sm">{job.message}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="job-full-actions">
+            {isPreviewCompleted && (
+              <button
+                type="button"
+                className="job-full-action-btn primary"
+                onClick={() => onLoadPreviews(job.jobId)}
+              >
+                프리뷰 선택하기
+              </button>
+            )}
+            {isCompositeCompleted && (
+              <button
+                type="button"
+                className="job-full-action-btn"
+                onClick={() => void onPlay(job.jobId)}
+              >
+                영상 재생
+              </button>
+            )}
+            {isCompositeCompleted && (
+              <button
+                type="button"
+                className="job-full-action-btn download"
+                onClick={() => void onDownload(job.jobId)}
+              >
+                결과 다운로드
+              </button>
+            )}
+            {!isPreviewCompleted && !isCompositeCompleted && (
+              <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 12, color: 'var(--ws-text-muted)', textAlign: 'center' as const }}>
+                {job.status === 'QUEUED' ? '처리 대기 중...' : '처리 진행 중...'}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type Tab = 'all' | 'running' | 'waiting' | 'done';
 type WorkspaceSection = 'studio' | 'results' | 'history';
 
@@ -661,17 +871,7 @@ function WorkspaceStatusTabs({ tab, onChange }: { tab: Tab; onChange: (next: Tab
         <button
           key={id}
           onClick={() => onChange(id)}
-          style={{
-            padding: '4px 12px',
-            borderRadius: 20,
-            fontSize: 11,
-            fontWeight: 600,
-            background: tab === id ? '#4a6cf7' : '#f0f2f8',
-            color: tab === id ? '#fff' : '#888',
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'all 0.15s',
-          }}
+          className={`workspace-status-tab ${tab === id ? 'active' : ''}`}
         >
           {label}
         </button>
@@ -706,62 +906,68 @@ function WorkspaceStudioView({
   const selectedJob = jobs.find((job) => job.jobId === selectedJobId) ?? null;
 
   return (
-    <div className="workspace-studio-layout">
-      <div className="workspace-studio-main">
-        <div
-          style={{
-            padding: '16px 24px',
-            background: '#fff',
-            borderBottom: '1px solid #e5e7ef',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexShrink: 0,
-          }}
-        >
-          <div>
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>나의 작업들</span>
-            <span style={{ fontSize: 12, color: '#aaa', marginLeft: 8 }}>· {jobs.length}개</span>
-          </div>
+    <div className="workspace-studio-full">
+      {/* Tab bar */}
+      <div className="job-tab-bar">
+        <div className="job-tabs-scroll">
+          {jobs.map((job) => {
+            const isActive = job.jobId === selectedJobId;
+            const statusClass = `job-tab-${job.status.toLowerCase()}`;
+            return (
+              <button
+                key={job.jobId}
+                type="button"
+                className={`job-tab ${statusClass} ${isActive ? 'active' : ''}`}
+                onClick={() => onSelectJob(job.jobId)}
+              >
+                <span className="job-tab-dot" />
+                <span className="job-tab-id">{job.jobId.slice(-10)}</span>
+                <span className="job-tab-type">{job.jobType === 'PREVIEW' ? 'PV' : 'CS'}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="job-tab-bar-filter">
           <WorkspaceStatusTabs tab={tab} onChange={onTabChange} />
         </div>
+      </div>
 
-        <div className="workspace-right-content">
-          <div className="workspace-job-list">
-            {loadingJobs && (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
-                <div className="loading-spinner" />
-              </div>
-            )}
-            {!loadingJobs && filteredJobs.length === 0 && (
-              <div className="empty-state">
-                <span className="empty-state-icon" aria-hidden="true">
-                  <FileStackIcon />
-                </span>
-                <p style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>작업이 없습니다</p>
-                <p style={{ fontSize: 12, color: '#94a3b8' }}>왼쪽에서 새 작업을 만들어보세요</p>
-              </div>
-            )}
-            {filteredJobs.map((job) => (
-              <JobCard
-                key={job.jobId}
-                job={job}
-                selected={job.jobId === selectedJobId}
-                onSelect={() => onSelectJob(job.jobId)}
-                onDownload={onDownload}
-                onPlay={onPlay}
-                onSelectPreview={onLoadPreviews}
-              />
-            ))}
+      {/* Main content area */}
+      <div className="job-full-area">
+        {loadingJobs && (
+          <div className="job-full-empty">
+            <div className="loading-spinner" />
           </div>
-          <JobStagePanel
+        )}
+
+        {!loadingJobs && jobs.length === 0 && (
+          <div className="job-full-empty">
+            <div className="job-full-empty-icon">
+              <FileStackIcon />
+            </div>
+            <h3>작업이 없습니다</h3>
+            <p>왼쪽 사이드바에서 새 작업을 만들어보세요</p>
+          </div>
+        )}
+
+        {!loadingJobs && jobs.length > 0 && filteredJobs.length === 0 && !selectedJob && (
+          <div className="job-full-empty">
+            <div className="job-full-empty-icon">
+              <FileStackIcon />
+            </div>
+            <h3>해당 상태의 작업이 없습니다</h3>
+            <p>필터를 변경하거나 위 탭에서 직접 작업을 선택하세요</p>
+          </div>
+        )}
+
+        {!loadingJobs && selectedJob && (
+          <JobFullPanel
             job={selectedJob}
-            onOpenPreview={onLoadPreviews}
-            onDownload={(jobId) => {
-              void onDownload(jobId);
-            }}
+            onPlay={onPlay}
+            onDownload={onDownload}
+            onLoadPreviews={onLoadPreviews}
           />
-        </div>
+        )}
       </div>
     </div>
   );
@@ -782,35 +988,15 @@ function WorkspaceResultsView({
   );
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f0f2f8' }}>
-      <div
-        style={{
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #e5e7ef',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-        }}
-      >
+    <div className="workspace-view-container">
+      <div className="workspace-view-header">
         <div>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>내 결과물</span>
-          <span style={{ fontSize: 12, color: '#aaa', marginLeft: 8 }}>· {completedCompositeJobs.length}개</span>
+          <span className="workspace-view-header-title">내 결과물</span>
+          <span className="workspace-view-header-count">· {completedCompositeJobs.length}개</span>
         </div>
       </div>
 
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: 'auto',
-          padding: '20px 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 14,
-        }}
-      >
+      <div className="workspace-view-scroll">
         {loadingJobs && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
             <div className="loading-spinner" />
@@ -821,8 +1007,8 @@ function WorkspaceResultsView({
             <span className="empty-state-icon" aria-hidden="true">
               <FileStackIcon />
             </span>
-            <p style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>완료된 결과물이 없습니다</p>
-            <p style={{ fontSize: 12, color: '#94a3b8' }}>합성 작업이 완료되면 이곳에 표시됩니다</p>
+            <p className="workspace-empty-title">완료된 결과물이 없습니다</p>
+            <p className="workspace-empty-desc">합성 작업이 완료되면 이곳에 표시됩니다</p>
           </div>
         )}
         {completedCompositeJobs.map((job) => (
@@ -856,21 +1042,11 @@ function WorkspaceHistoryView({
   totalCount: number;
 }) {
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#f0f2f8' }}>
-      <div
-        style={{
-          padding: '16px 24px',
-          background: '#fff',
-          borderBottom: '1px solid #e5e7ef',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-        }}
-      >
+    <div className="workspace-view-container">
+      <div className="workspace-view-header">
         <div>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>작업내역</span>
-          <span style={{ fontSize: 12, color: '#aaa', marginLeft: 8 }}>· {totalCount}개</span>
+          <span className="workspace-view-header-title">작업내역</span>
+          <span className="workspace-view-header-count">· {totalCount}개</span>
         </div>
         <WorkspaceStatusTabs tab={tab} onChange={onTabChange} />
       </div>
@@ -881,8 +1057,8 @@ function WorkspaceHistoryView({
             <span className="empty-state-icon" aria-hidden="true">
               <FileStackIcon />
             </span>
-            <p style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>기록이 없습니다</p>
-            <p style={{ fontSize: 12, color: '#94a3b8' }}>왼쪽에서 작업을 등록하면 이곳에 누적됩니다</p>
+            <p className="workspace-empty-title">기록이 없습니다</p>
+            <p className="workspace-empty-desc">왼쪽에서 작업을 등록하면 이곳에 누적됩니다</p>
           </div>
         )}
         {filteredJobs.map((job) => (
@@ -1176,18 +1352,17 @@ export function WorkspacePage() {
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 300 }}
           />
           <div
+            className="workspace-prompt-error-modal"
             style={{
               position: 'fixed',
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              background: '#fff',
               borderRadius: 16,
               padding: '32px 28px',
               zIndex: 301,
               width: 400,
               maxWidth: '90vw',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
               animation: 'slideUpToast 0.2s ease',
             }}
           >
@@ -1197,32 +1372,32 @@ export function WorkspacePage() {
                   width: 40,
                   height: 40,
                   borderRadius: 10,
-                  background: 'linear-gradient(135deg, #ef4444, #f97316)',
+                  background: 'linear-gradient(135deg, #a855f7, #ec4899)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: 20,
                   flexShrink: 0,
+                  color: '#fff',
                 }}
               >
                 !
               </div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#111', margin: 0 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
                 프롬프트를 확인해주세요
               </h3>
             </div>
-            <p style={{ fontSize: 14, color: '#555', lineHeight: 1.6, margin: 0 }}>{promptError}</p>
-            <p style={{ fontSize: 12, color: '#999', marginTop: 12, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}>{promptError}</p>
+            <p className="ws-error-hint" style={{ fontSize: 12, marginTop: 12, lineHeight: 1.5 }}>
               예시: "책상 위 빈 공간에 놓아줘", "테이블 오른쪽 컵 옆에 배치해줘"
             </p>
             <button
               onClick={() => setPromptError(null)}
+              className="ws-error-btn"
               style={{
                 marginTop: 20,
                 width: '100%',
                 padding: 12,
-                background: '#4a6cf7',
-                color: '#fff',
                 border: 'none',
                 borderRadius: 10,
                 fontSize: 14,
@@ -1286,67 +1461,37 @@ function JobCard({ job, selected, onSelect, onDownload, onPlay, onSelectPreview 
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span
-            style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: '#111',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
+          <span className="job-card-id">
             {job.jobId}
           </span>
           {job.jobType && (
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                padding: '1px 6px',
-                borderRadius: 4,
-                background: job.jobType === 'PREVIEW' ? '#ede9fe' : '#ecfdf5',
-                color: job.jobType === 'PREVIEW' ? '#7c3aed' : '#059669',
-              }}
-            >
+            <span className={`job-card-type-badge ${job.jobType === 'PREVIEW' ? 'preview' : 'composite'}`}>
               {job.jobType === 'PREVIEW' ? '프리뷰' : '합성'}
             </span>
           )}
         </div>
         {job.message && (
-          <div
-            style={{
-              fontSize: 12,
-              color: '#aaa',
-              marginTop: 2,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
+          <div className="job-card-message">
             {job.message}
           </div>
         )}
         {job.stage && (
-          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{formatStage(job.stage)}</div>
+          <div className="job-card-stage">{formatStage(job.stage)}</div>
         )}
         {job.createdAt && (
-          <div style={{ fontSize: 11, color: '#ccc', marginTop: 4 }}>
+          <div className="job-card-date">
             {new Date(job.createdAt).toLocaleString('ko-KR')}
           </div>
         )}
         {(job.status === 'RUNNING' || job.status === 'COMPLETED') && (
           <div style={{ marginTop: 6 }}>
             {job.status === 'RUNNING' && (
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', display: 'block', marginBottom: 3 }}>{progress}%</span>
+              <span className="job-card-progress-pct">{progress}%</span>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div className="job-progress-track" style={{ flex: 1 }}>
                 <div className={`job-progress-fill ${cfg.progressCls}`} style={{ width: `${progress}%` }} />
               </div>
-              {job.status === 'RUNNING' && (
-                <img src="/images/robotboxgif.gif" alt="" style={{ height: 28, width: 'auto', flexShrink: 0 }} />
-              )}
             </div>
           </div>
         )}
