@@ -2200,7 +2200,8 @@ h6 {
     radial-gradient(ellipse 50% 40% at 90% 95%, rgba(34, 211, 238, 0.05), transparent 65%);
 }
 
-.workspace-shell > * {
+.workspace-shell > .workspace-topbar,
+.workspace-shell > .workspace-shell-body {
   position: relative;
   z-index: 1;
 }

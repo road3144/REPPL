@@ -11,6 +11,7 @@ import {
   type WorkspaceSettings,
 } from '../services/workspaceSettings';
 import type { JobItem, JobStatusResponse } from '../services/types';
+import type { TrackedJob } from '../hooks/useJobs';
 
 /* ── Status config ── */
 const STATUS_CFG: Record<
@@ -93,13 +94,11 @@ function JobFullPanel({
   onDownload,
   onLoadPreviews,
 }: {
-  job: JobItem;
+  job: TrackedJob;
   onPlay: (id: string) => Promise<void>;
   onDownload: (id: string) => Promise<void>;
   onLoadPreviews: (id: string) => void;
 }) {
-  const stages = getStageFlow(job);
-  const activeIndex = job.stage ? stages.findIndex((s) => s.key === job.stage) : -1;
   const progress = job.progress ?? (job.status === 'COMPLETED' ? 100 : 0);
   const isPreviewCompleted = job.jobType === 'PREVIEW' && job.status === 'COMPLETED';
   const isCompositeCompleted = job.jobType === 'COMPOSITE' && job.status === 'COMPLETED';
@@ -113,6 +112,33 @@ function JobFullPanel({
     job.status === 'RUNNING' ? `처리 중${job.progress != null ? ` (${job.progress}%)` : ''}` :
     job.status === 'QUEUED' ? '대기 중' :
     job.status === 'COMPLETED' ? '완료' : '실패';
+
+  // PREVIEW: dynamic stages from accumulated messageLog
+  const previewStages = job.jobType === 'PREVIEW'
+    ? (job.messageLog ?? []).map((msg, i) => {
+        const isLast = i === (job.messageLog ?? []).length - 1;
+        let tone: StageTone;
+        if (job.status === 'FAILED' && isLast) tone = 'failed';
+        else if (job.status === 'COMPLETED') tone = 'done';
+        else tone = isLast ? 'current' : 'done';
+        return { label: msg, tone, key: `msg-${i}` };
+      })
+    : null;
+
+  // COMPOSITE: static stage flow
+  const compositeStages = job.jobType !== 'PREVIEW'
+    ? (() => {
+        const stages = getStageFlow(job);
+        const activeIndex = job.stage ? stages.findIndex((s) => s.key === job.stage) : -1;
+        return stages.map((stage, i) => ({
+          label: stage.label,
+          tone: getStageTone(job, stage.key, i, activeIndex) as StageTone,
+          key: stage.key,
+        }));
+      })()
+    : null;
+
+  const renderedStages = previewStages ?? compositeStages ?? [];
 
   return (
     <div className="job-full-panel" key={job.jobId}>
@@ -148,25 +174,30 @@ function JobFullPanel({
         <div>
           <h4 className="job-full-section-title">처리 단계</h4>
           <div className="job-full-stages-vertical">
-            {stages.map((stage, i) => {
-              const tone = getStageTone(job, stage.key, i, activeIndex);
-              return (
-                <div
-                  key={`${stage.key}-${tone}`}
-                  className={`job-full-stage-row job-full-stage-row-${tone}`}
-                >
-                  <div className="job-full-stage-icon-col">
-                    <FullStageIcon tone={tone} />
-                  </div>
-                  <div className="job-full-stage-label-col">
-                    <span className="job-full-stage-row-label">
-                      {stage.label}
-                      {tone === 'current' && job.progress != null ? ` (${job.progress}%)` : ''}
-                    </span>
-                  </div>
+            {renderedStages.length === 0 && job.status === 'QUEUED' && (
+              <div className="job-full-stage-row job-full-stage-row-pending">
+                <div className="job-full-stage-icon-col"><FullStageIcon tone="pending" /></div>
+                <div className="job-full-stage-label-col">
+                  <span className="job-full-stage-row-label">대기 중...</span>
                 </div>
-              );
-            })}
+              </div>
+            )}
+            {renderedStages.map((stage) => (
+              <div
+                key={`${stage.key}-${stage.tone}`}
+                className={`job-full-stage-row job-full-stage-row-${stage.tone}`}
+              >
+                <div className="job-full-stage-icon-col">
+                  <FullStageIcon tone={stage.tone} />
+                </div>
+                <div className="job-full-stage-label-col">
+                  <span className="job-full-stage-row-label">
+                    {stage.label}
+                    {stage.tone === 'current' && job.progress != null ? ` (${job.progress}%)` : ''}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -311,7 +342,7 @@ const GUIDE_FAQ_ITEMS = [
   },
 ] as const;
 
-function filterJobsByTab(jobs: JobItem[], tab: Tab): JobItem[] {
+function filterJobsByTab(jobs: TrackedJob[], tab: Tab): TrackedJob[] {
   if (tab === 'running') return jobs.filter((job) => job.status === 'RUNNING');
   if (tab === 'waiting') return jobs.filter((job) => job.status === 'QUEUED');
   if (tab === 'done') return jobs.filter((job) => job.status === 'COMPLETED' || job.status === 'FAILED');
@@ -892,8 +923,8 @@ function WorkspaceStudioView({
   onDownload,
   onLoadPreviews,
 }: {
-  filteredJobs: JobItem[];
-  jobs: JobItem[];
+  filteredJobs: TrackedJob[];
+  jobs: TrackedJob[];
   loadingJobs: boolean;
   selectedJobId: string | null;
   tab: Tab;
