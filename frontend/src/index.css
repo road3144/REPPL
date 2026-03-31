@@ -2157,3 +2157,1268 @@ h6 {
     opacity: 1;
   }
 }
+
+/* ═══════════════════════════════════════════
+   PREMIUM PRO — Workspace Dark Theme
+   Scoped under .workspace-shell
+   ═══════════════════════════════════════════ */
+
+/* ── Design tokens ── */
+.workspace-shell {
+  --ws-bg: #08080F;
+  --ws-surface: #0E0E1A;
+  --ws-surface-2: #141428;
+  --ws-border: rgba(255, 255, 255, 0.07);
+  --ws-border-active: rgba(139, 148, 255, 0.32);
+  --ws-accent: #8B94FF;
+  --ws-accent-2: #22D3EE;
+  --ws-accent-glow: rgba(139, 148, 255, 0.14);
+  --ws-text: #E8EAF2;
+  --ws-text-2: #9199B5;
+  --ws-text-muted: #4B5068;
+  --ws-emerald: #34D399;
+  --ws-amber: #FBBF24;
+  --ws-rose: #F87171;
+}
+
+/* ── Dot-grid background (premium minimal) ── */
+.workspace-shell {
+  background-color: var(--ws-bg);
+  background-image: radial-gradient(rgba(139, 148, 255, 0.055) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* ── Ambient glow (subtle, refined) ── */
+.workspace-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 65% 55% at 18% -8%, rgba(99, 102, 241, 0.07), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 90% 95%, rgba(34, 211, 238, 0.05), transparent 65%);
+}
+
+.workspace-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Animations ── */
+@keyframes ws-stage-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(139, 148, 255, 0.12); }
+  50%       { box-shadow: 0 0 0 7px rgba(139, 148, 255, 0.22), 0 0 18px rgba(139, 148, 255, 0.10); }
+}
+
+@keyframes ws-tab-dot-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+@keyframes ws-fade-slide-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ws-barber {
+  from { background-position: 0 0; }
+  to   { background-position: 22px 0; }
+}
+
+/* ── Top Bar ── */
+.workspace-shell .workspace-topbar {
+  background: rgba(8, 8, 15, 0.96);
+  border-bottom: 1px solid var(--ws-border);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.workspace-shell .workspace-topbar-logo {
+  color: var(--ws-text);
+}
+
+.workspace-shell .workspace-topbar-logo span {
+  background: linear-gradient(135deg, var(--ws-accent), var(--ws-accent-2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Sidebar ── */
+.workspace-shell .workspace-sidebar {
+  background: rgba(8, 8, 15, 0.90);
+  border-right: 1px solid var(--ws-border);
+}
+
+.workspace-shell .workspace-sidebar-title {
+  color: var(--ws-text-muted);
+}
+
+.workspace-shell .workspace-sidebar-item,
+.workspace-shell .workspace-sidebar-subitem {
+  color: var(--ws-text-2);
+}
+
+.workspace-shell .workspace-sidebar-item:hover,
+.workspace-shell .workspace-sidebar-subitem:hover {
+  background: rgba(139, 148, 255, 0.07);
+  color: var(--ws-text);
+}
+
+.workspace-shell .workspace-sidebar-item.active {
+  background: rgba(139, 148, 255, 0.10);
+  color: var(--ws-accent);
+  border: 1px solid rgba(139, 148, 255, 0.20);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.workspace-shell .workspace-sidebar-count {
+  background: rgba(139, 148, 255, 0.20);
+  color: var(--ws-accent);
+}
+
+.workspace-shell .workspace-sidebar-item:not(.active) .workspace-sidebar-count {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ws-text-muted);
+}
+
+/* ── Create Button ── */
+.workspace-shell .workspace-create-btn {
+  background: linear-gradient(135deg, var(--ws-accent), var(--ws-accent-2));
+  box-shadow: 0 4px 16px rgba(139, 148, 255, 0.28);
+  transition: all 0.22s ease;
+}
+
+.workspace-shell .workspace-create-btn:hover {
+  box-shadow: 0 6px 24px rgba(139, 148, 255, 0.42);
+  transform: translateY(-1px);
+}
+
+/* ── View header ── */
+.workspace-view-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: transparent;
+}
+
+.workspace-view-header {
+  padding: 14px 24px;
+  background: rgba(8, 8, 15, 0.88);
+  border-bottom: 1px solid var(--ws-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.workspace-view-header-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ws-text);
+}
+
+.workspace-view-header-count {
+  font-size: 12px;
+  color: var(--ws-text-muted);
+  margin-left: 8px;
+}
+
+.workspace-view-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Status Tabs ── */
+.workspace-status-tab {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ws-text-muted);
+  border: 1px solid var(--ws-border);
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.workspace-status-tab:hover {
+  background: rgba(139, 148, 255, 0.08);
+  color: var(--ws-text-2);
+}
+
+.workspace-status-tab.active {
+  background: rgba(139, 148, 255, 0.14);
+  color: var(--ws-accent);
+  border-color: rgba(139, 148, 255, 0.28);
+  box-shadow: 0 2px 10px rgba(139, 148, 255, 0.14);
+}
+
+/* ── Job Tab Bar ── */
+.workspace-studio-full {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.job-tab-bar {
+  height: 48px;
+  display: flex;
+  align-items: stretch;
+  background: rgba(8, 8, 15, 0.92);
+  border-bottom: 1px solid var(--ws-border);
+  flex-shrink: 0;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.job-tabs-scroll {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  flex: 1;
+  scrollbar-width: none;
+}
+
+.job-tabs-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.job-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 18px;
+  border: none;
+  background: transparent;
+  border-right: 1px solid var(--ws-border);
+  color: var(--ws-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+  transition: background 0.16s, color 0.16s;
+  min-width: 130px;
+  flex-shrink: 0;
+}
+
+.job-tab:hover {
+  background: rgba(139, 148, 255, 0.05);
+  color: var(--ws-text-2);
+}
+
+.job-tab.active {
+  background: rgba(139, 148, 255, 0.08);
+  color: var(--ws-text);
+}
+
+.job-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--ws-accent), var(--ws-accent-2));
+  border-radius: 2px 2px 0 0;
+}
+
+.job-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--ws-text-muted);
+}
+
+.job-tab.job-tab-running .job-tab-dot {
+  background: var(--ws-accent);
+  box-shadow: 0 0 6px rgba(139, 148, 255, 0.7);
+  animation: ws-tab-dot-blink 1.6s ease-in-out infinite;
+}
+
+.job-tab.job-tab-completed .job-tab-dot {
+  background: var(--ws-emerald);
+}
+
+.job-tab.job-tab-failed .job-tab-dot {
+  background: var(--ws-rose);
+}
+
+.job-tab.job-tab-queued .job-tab-dot {
+  background: var(--ws-text-muted);
+}
+
+.job-tab-id {
+  font-family: 'Space Grotesk', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+
+.job-tab-type {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ws-text-muted);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.job-tab.active .job-tab-type {
+  background: rgba(139, 148, 255, 0.14);
+  color: var(--ws-accent);
+}
+
+.job-tab-bar-filter {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  border-left: 1px solid var(--ws-border);
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ── Full Job View Area ── */
+.job-full-area {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 36px 48px;
+  display: flex;
+  flex-direction: column;
+}
+
+.job-full-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  animation: ws-fade-slide-in 0.30s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 1000px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* ── Full Panel Header ── */
+.job-full-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.job-full-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.job-full-title {
+  margin: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--ws-text);
+  letter-spacing: -0.025em;
+  word-break: break-all;
+  line-height: 1.2;
+}
+
+.job-full-type {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ws-text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.job-full-status-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.job-full-progress-pct {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--ws-accent);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+/* ── Full width progress bar ── */
+.job-full-progress-track {
+  height: 5px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.job-full-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.6s ease;
+}
+
+.job-full-progress-fill.running {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--ws-accent),
+    var(--ws-accent) 8px,
+    var(--ws-accent-2) 8px,
+    var(--ws-accent-2) 16px
+  );
+  background-size: 22px 22px;
+  animation: ws-barber 0.55s linear infinite;
+  box-shadow: 0 0 12px rgba(139, 148, 255, 0.45);
+}
+
+.job-full-progress-fill.completed {
+  background: linear-gradient(90deg, rgba(52, 211, 153, 0.5), var(--ws-emerald));
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.30);
+}
+
+.job-full-progress-fill.failed {
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0.5), var(--ws-rose));
+}
+
+.job-full-progress-fill.queued {
+  background: rgba(255, 255, 255, 0.18);
+  width: 8% !important;
+}
+
+/* ── Stage Pipeline ── */
+.job-full-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.job-full-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--ws-border);
+  background: var(--ws-surface);
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.job-full-stage.job-full-stage-done {
+  border-color: rgba(52, 211, 153, 0.20);
+  background: rgba(52, 211, 153, 0.04);
+}
+
+.job-full-stage.job-full-stage-current {
+  border-color: rgba(139, 148, 255, 0.38);
+  background: rgba(139, 148, 255, 0.08);
+  box-shadow: 0 0 20px rgba(139, 148, 255, 0.08), 0 0 0 1px rgba(139, 148, 255, 0.12);
+}
+
+.job-full-stage.job-full-stage-failed {
+  border-color: rgba(248, 113, 113, 0.24);
+  background: rgba(248, 113, 113, 0.05);
+}
+
+.job-full-stage-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ws-text-muted);
+  white-space: nowrap;
+}
+
+.job-full-stage.job-full-stage-done .job-full-stage-label {
+  color: var(--ws-emerald);
+}
+
+.job-full-stage.job-full-stage-current .job-full-stage-label {
+  color: var(--ws-text);
+  font-weight: 700;
+}
+
+.job-full-stage.job-full-stage-failed .job-full-stage-label {
+  color: var(--ws-rose);
+}
+
+/* ── Stage icons in full view ── */
+.job-full-stage-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.job-full-stage-icon svg {
+  width: 11px;
+  height: 11px;
+}
+
+.job-full-stage-icon-done {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--ws-emerald);
+}
+
+.job-full-stage-icon-current {
+  background: linear-gradient(135deg, var(--ws-accent), var(--ws-accent-2));
+  animation: ws-stage-pulse 2s ease-in-out infinite;
+}
+
+.job-full-stage-icon-pending {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1.5px solid rgba(255, 255, 255, 0.10);
+}
+
+.job-full-stage-icon-failed {
+  background: rgba(248, 113, 113, 0.14);
+  color: var(--ws-rose);
+}
+
+/* ── Bottom: meta + actions ── */
+.job-full-bottom {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 20px;
+  align-items: start;
+}
+
+.job-full-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.job-full-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+}
+
+.job-full-meta-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ws-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+}
+
+.job-full-meta-value {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ws-text-2);
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.job-full-meta-value.running {
+  color: var(--ws-amber);
+}
+
+.job-full-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 170px;
+}
+
+.job-full-action-btn {
+  width: 100%;
+  border: 1px solid rgba(139, 148, 255, 0.22);
+  border-radius: 10px;
+  background: rgba(139, 148, 255, 0.08);
+  color: var(--ws-accent);
+  font-size: 0.86rem;
+  font-weight: 700;
+  padding: 13px 20px;
+  cursor: pointer;
+  transition: all 0.22s ease;
+}
+
+.job-full-action-btn:hover {
+  background: rgba(139, 148, 255, 0.16);
+  box-shadow: 0 8px 24px rgba(139, 148, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.job-full-action-btn.primary {
+  background: linear-gradient(135deg, var(--ws-accent), var(--ws-accent-2));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 18px rgba(139, 148, 255, 0.22);
+}
+
+.job-full-action-btn.primary:hover {
+  box-shadow: 0 10px 30px rgba(139, 148, 255, 0.36);
+}
+
+.job-full-action-btn.download {
+  background: rgba(52, 211, 153, 0.08);
+  color: var(--ws-emerald);
+  border-color: rgba(52, 211, 153, 0.20);
+}
+
+.job-full-action-btn.download:hover {
+  background: rgba(52, 211, 153, 0.15);
+  box-shadow: 0 8px 24px rgba(52, 211, 153, 0.16);
+}
+
+/* ── Empty states ── */
+.job-full-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--ws-text-muted);
+  text-align: center;
+  animation: ws-fade-slide-in 0.28s ease;
+}
+
+.job-full-empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ws-text-muted);
+  margin-bottom: 4px;
+}
+
+.job-full-empty h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ws-text-2);
+}
+
+.job-full-empty p {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--ws-text-muted);
+}
+
+/* ── Job Cards (results / history views) ── */
+.workspace-shell .job-card {
+  background: rgba(14, 14, 26, 0.80);
+  border: 1px solid var(--ws-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: border-color 0.24s, box-shadow 0.24s, transform 0.24s;
+}
+
+.workspace-shell .job-card:hover {
+  border-color: rgba(139, 148, 255, 0.30);
+  background: rgba(18, 18, 36, 0.92);
+  box-shadow: 0 6px 28px rgba(139, 148, 255, 0.08);
+  transform: translateY(-2px);
+}
+
+.workspace-shell .job-card-selected {
+  border-color: rgba(139, 148, 255, 0.42) !important;
+  box-shadow: 0 0 0 1px rgba(139, 148, 255, 0.22), 0 8px 32px rgba(139, 148, 255, 0.12) !important;
+  background: rgba(20, 20, 40, 0.90) !important;
+}
+
+/* ── Job card inner text ── */
+.workspace-shell .job-card-id { color: var(--ws-text); }
+.workspace-shell .job-card-type-badge.preview {
+  background: rgba(139, 148, 255, 0.12);
+  color: var(--ws-accent);
+}
+.workspace-shell .job-card-type-badge.composite {
+  background: rgba(52, 211, 153, 0.10);
+  color: var(--ws-emerald);
+}
+.workspace-shell .job-card-message  { color: var(--ws-text-muted); }
+.workspace-shell .job-card-stage    { color: var(--ws-text-muted); }
+.workspace-shell .job-card-date     { color: var(--ws-text-muted); }
+.workspace-shell .job-card-progress-pct { color: var(--ws-accent); }
+
+/* ── Stage Panel (in results/history as fallback) ── */
+.workspace-shell .job-stage-panel {
+  background: rgba(8, 8, 15, 0.88);
+  border-left: 1px solid var(--ws-border);
+}
+
+.workspace-shell .job-stage-panel-title { color: var(--ws-text); }
+.workspace-shell .job-stage-panel-subtitle { color: var(--ws-text-muted); }
+.workspace-shell .job-stage-section-title { color: var(--ws-text-2); }
+.workspace-shell .job-stage-name { color: var(--ws-text-muted); }
+.workspace-shell .job-stage-item-done .job-stage-name { color: var(--ws-text-2); }
+.workspace-shell .job-stage-item-current .job-stage-name { color: var(--ws-accent); font-weight: 800; }
+.workspace-shell .job-stage-item-failed .job-stage-name { color: var(--ws-rose); }
+
+.workspace-shell .job-stage-icon-current {
+  background: linear-gradient(135deg, var(--ws-accent), var(--ws-accent-2));
+  animation: ws-stage-pulse 2s ease-in-out infinite;
+}
+
+.workspace-shell .job-stage-icon-pending {
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.workspace-shell .job-stage-icon-done {
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--ws-emerald);
+}
+
+.workspace-shell .job-stage-icon-failed {
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--ws-rose);
+}
+
+.workspace-shell .job-stage-progress-track {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.workspace-shell .job-stage-progress-fill {
+  background: linear-gradient(90deg, var(--ws-accent), var(--ws-accent-2));
+  box-shadow: 0 0 8px rgba(139, 148, 255, 0.40);
+}
+
+.workspace-shell .job-stage-meta-row { border-bottom-color: rgba(255, 255, 255, 0.05); }
+.workspace-shell .job-stage-meta-row span { color: var(--ws-text-muted); }
+.workspace-shell .job-stage-meta-row strong { color: var(--ws-text-2); }
+
+.workspace-shell .job-stage-action-btn {
+  background: linear-gradient(135deg, var(--ws-accent), var(--ws-accent-2));
+  box-shadow: 0 6px 20px rgba(139, 148, 255, 0.25);
+  transition: all 0.22s ease;
+}
+
+.workspace-shell .job-stage-action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(139, 148, 255, 0.38);
+}
+
+.workspace-shell .job-stage-action-btn-download {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  box-shadow: 0 6px 20px rgba(52, 211, 153, 0.20);
+}
+
+.workspace-shell .job-stage-empty {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: var(--ws-border);
+  color: var(--ws-text-muted);
+}
+
+/* ── Progress bars ── */
+.workspace-shell .job-progress-track { background: rgba(255, 255, 255, 0.06); }
+
+.workspace-shell .job-progress-amber {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--ws-accent),
+    var(--ws-accent) 8px,
+    var(--ws-accent-2) 8px,
+    var(--ws-accent-2) 16px
+  );
+  background-size: 22px 22px;
+  animation: barber-pole 0.55s linear infinite;
+  box-shadow: 0 0 8px rgba(139, 148, 255, 0.40);
+}
+
+.workspace-shell .job-progress-emerald {
+  background: linear-gradient(90deg, rgba(52, 211, 153, 0.4), #34d399);
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.30);
+}
+
+.workspace-shell .job-progress-rose {
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0.4), var(--ws-rose));
+}
+
+.workspace-shell .job-progress-slate { background: rgba(255, 255, 255, 0.12); }
+
+/* ── Status badges ── */
+.workspace-shell .job-status-amber {
+  background: rgba(139, 148, 255, 0.10);
+  color: var(--ws-accent);
+}
+
+.workspace-shell .job-status-slate {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ws-text-muted);
+}
+
+.workspace-shell .job-status-emerald {
+  background: rgba(52, 211, 153, 0.10);
+  color: var(--ws-emerald);
+}
+
+.workspace-shell .job-status-rose {
+  background: rgba(248, 113, 113, 0.10);
+  color: var(--ws-rose);
+}
+
+/* ── Empty state ── */
+.workspace-shell .empty-state {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: var(--ws-border);
+}
+
+.workspace-empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ws-text-2);
+}
+
+.workspace-empty-desc {
+  font-size: 12px;
+  color: var(--ws-text-muted);
+}
+
+/* ── Loading Spinner ── */
+.workspace-shell .loading-spinner {
+  border-color: rgba(139, 148, 255, 0.12);
+  border-top-color: var(--ws-accent);
+}
+
+/* ── Download Button ── */
+.workspace-shell .download-btn {
+  background: rgba(52, 211, 153, 0.06);
+  border-color: rgba(52, 211, 153, 0.18);
+  color: var(--ws-emerald);
+}
+
+.workspace-shell .download-btn:hover {
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.32);
+  box-shadow: 0 6px 16px rgba(52, 211, 153, 0.12);
+}
+
+/* ── Create Modal ── */
+.workspace-shell .workspace-create-modal {
+  background: #0C0C18;
+  border: 1px solid var(--ws-border);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.60), 0 0 0 1px rgba(139, 148, 255, 0.08);
+}
+
+.workspace-shell .workspace-create-modal-header {
+  border-bottom-color: var(--ws-border);
+}
+
+.workspace-shell .workspace-create-modal-header h2 { color: var(--ws-text); }
+.workspace-shell .workspace-create-modal-header p  { color: var(--ws-text-muted); }
+.workspace-shell .workspace-create-modal-header button { color: var(--ws-text-muted); }
+.workspace-shell .workspace-create-modal-backdrop { background: rgba(4, 4, 10, 0.75); }
+
+/* ── Guide Modal ── */
+.workspace-shell .workspace-guide-modal {
+  background: #0C0C18;
+  border: 1px solid var(--ws-border);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.60);
+}
+
+.workspace-shell .workspace-guide-modal-header { border-bottom-color: var(--ws-border); }
+.workspace-shell .workspace-guide-modal-header h2 { color: var(--ws-text); }
+.workspace-shell .workspace-guide-modal-header p  { color: var(--ws-text-muted); }
+.workspace-shell .workspace-guide-close-btn { color: var(--ws-text-muted); }
+.workspace-shell .workspace-guide-modal-body { background: #080810; }
+
+.workspace-shell .workspace-guide-hero {
+  background: linear-gradient(145deg, rgba(139, 148, 255, 0.08), rgba(34, 211, 238, 0.04));
+  border-color: rgba(139, 148, 255, 0.18);
+}
+
+.workspace-shell .workspace-guide-hero strong { color: var(--ws-accent); }
+.workspace-shell .workspace-guide-hero p { color: var(--ws-text-2); }
+
+.workspace-shell .workspace-guide-badge {
+  background: rgba(139, 148, 255, 0.08);
+  border-color: rgba(139, 148, 255, 0.20);
+  color: var(--ws-accent);
+}
+
+.workspace-shell .workspace-guide-section { background: rgba(12, 12, 24, 0.88); border-color: var(--ws-border); }
+.workspace-shell .workspace-guide-section h3 { color: var(--ws-text); }
+.workspace-shell .workspace-guide-step-card { background: rgba(139, 148, 255, 0.03); border-color: var(--ws-border); }
+.workspace-shell .workspace-guide-step-index { color: var(--ws-accent); }
+.workspace-shell .workspace-guide-step-card h4 { color: var(--ws-text); }
+.workspace-shell .workspace-guide-step-card p  { color: var(--ws-text-muted); }
+
+.workspace-shell .workspace-guide-rule-card { background: rgba(12, 12, 24, 0.88); border-color: var(--ws-border); }
+.workspace-shell .workspace-guide-rule-card.good { background: rgba(52, 211, 153, 0.04); border-color: rgba(52, 211, 153, 0.18); }
+.workspace-shell .workspace-guide-rule-card.bad  { background: rgba(248, 113, 113, 0.04); border-color: rgba(248, 113, 113, 0.16); }
+.workspace-shell .workspace-guide-rule-card h4 { color: var(--ws-text); }
+.workspace-shell .workspace-guide-rule-card li { color: var(--ws-text-2); }
+
+.workspace-shell .workspace-guide-status-card { background: rgba(139, 148, 255, 0.03); border-color: var(--ws-border); }
+.workspace-shell .workspace-guide-status-card strong { color: var(--ws-text); }
+.workspace-shell .workspace-guide-status-card p { color: var(--ws-text-muted); }
+
+.workspace-shell .workspace-guide-faq-item { background: rgba(255, 255, 255, 0.02); border-color: var(--ws-border); }
+.workspace-shell .workspace-guide-faq-item summary { color: var(--ws-text); }
+.workspace-shell .workspace-guide-faq-item p { color: var(--ws-text-muted); }
+.workspace-shell .workspace-guide-modal-backdrop { background: rgba(4, 4, 10, 0.75); }
+
+/* ── Settings Modal ── */
+.workspace-shell .workspace-settings-modal {
+  background: #0C0C18;
+  border-color: var(--ws-border);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.60);
+}
+
+.workspace-shell .workspace-settings-modal-header { border-bottom-color: var(--ws-border); }
+.workspace-shell .workspace-settings-modal-header h2 { color: var(--ws-text); }
+.workspace-shell .workspace-settings-modal-header p  { color: var(--ws-text-muted); }
+.workspace-shell .workspace-settings-close-btn { color: var(--ws-text-muted); }
+.workspace-shell .workspace-settings-modal-body { background: #080810; }
+
+.workspace-shell .workspace-settings-section { background: rgba(12, 12, 24, 0.88); border-color: var(--ws-border); }
+.workspace-shell .workspace-settings-section h3 { color: var(--ws-text); }
+
+.workspace-shell .workspace-settings-switch-copy strong { color: var(--ws-text); }
+.workspace-shell .workspace-settings-switch-copy p { color: var(--ws-text-muted); }
+
+.workspace-shell .workspace-settings-switch {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+.workspace-shell .workspace-settings-switch.on {
+  background: linear-gradient(135deg, var(--ws-accent), var(--ws-accent-2));
+  border-color: var(--ws-accent);
+}
+
+.workspace-shell .workspace-settings-help-row { border-top-color: rgba(255, 255, 255, 0.05); }
+.workspace-shell .workspace-settings-help-row span { color: var(--ws-text-muted); }
+.workspace-shell .workspace-settings-radio { color: var(--ws-text-2); }
+.workspace-shell .workspace-settings-radio input { accent-color: var(--ws-accent); }
+.workspace-shell .workspace-settings-field-label { color: var(--ws-text-muted); }
+
+.workspace-shell .workspace-settings-textarea {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--ws-border);
+  color: var(--ws-text);
+}
+
+.workspace-shell .workspace-settings-textarea:focus {
+  border-color: rgba(139, 148, 255, 0.42);
+  box-shadow: 0 0 0 2px rgba(139, 148, 255, 0.12);
+}
+
+.workspace-shell .workspace-settings-modal-footer { border-top-color: var(--ws-border); }
+
+.workspace-shell .workspace-settings-secondary-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--ws-border);
+  color: var(--ws-text-2);
+}
+
+.workspace-shell .workspace-settings-primary-btn {
+  background: linear-gradient(135deg, var(--ws-accent), var(--ws-accent-2));
+  color: #fff;
+}
+
+.workspace-shell .workspace-settings-modal-backdrop { background: rgba(4, 4, 10, 0.75); }
+
+/* ── Prompt Error Modal ── */
+.workspace-prompt-error-modal {
+  background: #0C0C18;
+  border: 1px solid rgba(248, 113, 113, 0.24);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.60);
+}
+
+.workspace-prompt-error-modal h3 { color: var(--ws-text); }
+.workspace-prompt-error-modal p  { color: var(--ws-text-2); }
+.workspace-prompt-error-modal .ws-error-hint { color: var(--ws-text-muted); }
+.workspace-prompt-error-modal .ws-error-btn {
+  background: linear-gradient(135deg, var(--ws-accent), var(--ws-accent-2));
+  box-shadow: 0 6px 18px rgba(139, 148, 255, 0.28);
+}
+
+/* ── Scrollbar ── */
+.workspace-shell ::-webkit-scrollbar-track { background: transparent; }
+.workspace-shell ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); }
+.workspace-shell ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.14); }
+
+/* ── Form elements inside workspace ── */
+.workspace-shell .drop-zone {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+.workspace-shell .drop-zone:hover {
+  border-color: rgba(139, 148, 255, 0.30);
+  background: rgba(139, 148, 255, 0.04);
+}
+
+.workspace-shell .drop-zone-active {
+  border-color: var(--ws-accent) !important;
+  background: rgba(139, 148, 255, 0.06) !important;
+  box-shadow: 0 0 0 4px rgba(139, 148, 255, 0.10) !important;
+}
+
+.workspace-shell .drop-zone-filled {
+  border-color: rgba(139, 148, 255, 0.18);
+  background: rgba(139, 148, 255, 0.03);
+}
+
+.workspace-shell .prompt-textarea {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.09);
+  color: var(--ws-text);
+}
+
+.workspace-shell .prompt-textarea::placeholder { color: var(--ws-text-muted); }
+
+.workspace-shell .prompt-textarea:focus {
+  border-color: rgba(139, 148, 255, 0.40);
+  box-shadow: 0 0 0 3px rgba(139, 148, 255, 0.10);
+}
+
+.workspace-shell .submit-btn {
+  background: linear-gradient(135deg, var(--ws-accent), var(--ws-accent-2));
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(139, 148, 255, 0.28);
+}
+
+.workspace-shell .submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(139, 148, 255, 0.42);
+}
+
+.workspace-shell .submit-btn:disabled {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ws-text-muted);
+  box-shadow: none;
+}
+
+.workspace-shell .submit-progress-fill {
+  background: linear-gradient(90deg, var(--ws-accent), var(--ws-accent-2));
+}
+
+.workspace-shell .form-label { color: var(--ws-text-2); }
+
+.workspace-shell .form-label .step-badge {
+  background: linear-gradient(135deg, var(--ws-accent), var(--ws-accent-2));
+  color: #fff;
+}
+
+.workspace-shell .guide-chip {
+  background: rgba(139, 148, 255, 0.08);
+  border-color: rgba(139, 148, 255, 0.18);
+  color: var(--ws-accent);
+}
+
+/* ── Studio layout (results/history still show old split) ── */
+.workspace-shell .workspace-studio-layout {
+  background: transparent;
+}
+
+/* ═══════════════════════════════════════════
+   Vertical Stage Timeline
+   ═══════════════════════════════════════════ */
+
+/* ── Completion animations ── */
+@keyframes ws-icon-pop {
+  0%   { transform: scale(0);   opacity: 0; }
+  60%  { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes ws-row-done-enter {
+  0%   { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+@keyframes ws-row-current-enter {
+  0%   { opacity: 0; transform: translateX(-6px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Full panel body: 2-column layout ── */
+.job-full-body {
+  display: grid;
+  grid-template-columns: 1fr 200px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .job-full-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Section title ── */
+.job-full-section-title {
+  margin: 0 0 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ws-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+}
+
+/* ── Vertical stage list ── */
+.job-full-stages-vertical {
+  display: flex;
+  flex-direction: column;
+}
+
+.job-full-stage-row {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 0 12px;
+}
+
+/* Icon column with connector line */
+.job-full-stage-icon-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.job-full-stage-icon-col::after {
+  content: '';
+  width: 2px;
+  flex: 1;
+  min-height: 14px;
+  margin: 3px 0;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 1px;
+  transition: background 0.4s ease;
+}
+
+.job-full-stage-row:last-child .job-full-stage-icon-col::after {
+  display: none;
+}
+
+/* Connector colors by tone */
+.job-full-stage-row-done .job-full-stage-icon-col::after {
+  background: linear-gradient(to bottom, rgba(52, 211, 153, 0.38), rgba(52, 211, 153, 0.10));
+}
+
+.job-full-stage-row-current .job-full-stage-icon-col::after {
+  background: linear-gradient(to bottom, rgba(139, 148, 255, 0.30), rgba(255, 255, 255, 0.04));
+}
+
+/* Label column */
+.job-full-stage-label-col {
+  padding: 2px 0 18px;
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+}
+
+.job-full-stage-row:last-child .job-full-stage-label-col {
+  padding-bottom: 2px;
+}
+
+.job-full-stage-row-label {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--ws-text-muted);
+  transition: color 0.3s ease;
+  line-height: 1.4;
+}
+
+/* ── Done state: completion animation ── */
+.job-full-stage-row-done {
+  animation: ws-row-done-enter 0.4s ease forwards;
+}
+
+.job-full-stage-row-done .job-full-stage-row-label {
+  color: var(--ws-emerald);
+}
+
+/* Icon pop on completion */
+.job-full-stage-row-done .job-full-stage-icon {
+  animation: ws-icon-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ── Current state ── */
+.job-full-stage-row-current {
+  animation: ws-row-current-enter 0.3s ease forwards;
+}
+
+.job-full-stage-row-current .job-full-stage-row-label {
+  color: var(--ws-text);
+  font-weight: 700;
+}
+
+/* ── Failed state ── */
+.job-full-stage-row-failed .job-full-stage-row-label {
+  color: var(--ws-rose);
+}
+
+/* ── Right side panel ── */
+.job-full-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+}
+
+.job-full-meta-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.job-full-meta-item-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+}
+
+.job-full-meta-label-sm {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--ws-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+}
+
+.job-full-meta-value-sm {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ws-text-2);
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.job-full-meta-value-sm.running {
+  color: var(--ws-amber);
+}
+
