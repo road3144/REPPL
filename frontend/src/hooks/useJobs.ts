@@ -200,9 +200,9 @@ export function useJobs() {
     setPreviewSelecting({
       jobId,
       previews: [
-        { index: 0, key: 'fixed-0', url: '/images/preview_fixed_1.png' },
-        { index: 1, key: 'fixed-1', url: '/images/preview_fixed_2.png' },
-        { index: 2, key: 'fixed-2', url: '/images/preview_fixed_3.png' },
+        { index: 0, key: 'fixed-0', url: 'https://reppl-bucket.s3.ap-northeast-2.amazonaws.com/public/images/preview_fixed_1.png' },
+        { index: 1, key: 'fixed-1', url: 'https://reppl-bucket.s3.ap-northeast-2.amazonaws.com/public/images/preview_fixed_2.png' },
+        { index: 2, key: 'fixed-2', url: 'https://reppl-bucket.s3.ap-northeast-2.amazonaws.com/public/images/preview_fixed_3.png' },
       ],
     });
   };
