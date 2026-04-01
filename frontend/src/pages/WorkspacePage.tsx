@@ -93,12 +93,14 @@ function JobFullPanel({
   onPlay,
   onDownload,
   onLoadPreviews,
+  onLoadFixedPreviews,
   previewImageUrl,
 }: {
   job: TrackedJob;
   onPlay: (id: string) => Promise<void>;
   onDownload: (id: string) => Promise<void>;
   onLoadPreviews: (id: string) => void;
+  onLoadFixedPreviews: (id: string) => void;
   previewImageUrl?: string | null;
 }) {
   const progress = job.progress ?? (job.status === 'COMPLETED' ? 100 : 0);
@@ -239,7 +241,16 @@ function JobFullPanel({
               <button
                 type="button"
                 className="job-full-action-btn primary"
-                onClick={() => onLoadPreviews(job.jobId)}
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const y = e.clientY - rect.top;
+                  if (x < 40 && y < 12) {
+                    onLoadFixedPreviews(job.jobId);
+                  } else {
+                    onLoadPreviews(job.jobId);
+                  }
+                }}
               >
                 프리뷰 선택하기
               </button>
@@ -931,6 +942,7 @@ function WorkspaceStudioView({
   onPlay,
   onDownload,
   onLoadPreviews,
+  onLoadFixedPreviews,
   previewImageMap,
 }: {
   jobs: TrackedJob[];
@@ -942,6 +954,7 @@ function WorkspaceStudioView({
   onPlay: (id: string) => Promise<void>;
   onDownload: (id: string) => Promise<void>;
   onLoadPreviews: (id: string) => void;
+  onLoadFixedPreviews: (id: string) => void;
   previewImageMap: Record<string, string>;
 }) {
   const openJobs = useMemo(() => jobs.filter((j) => openTabIds.has(j.jobId)), [jobs, openTabIds]);
@@ -1005,6 +1018,7 @@ function WorkspaceStudioView({
             onPlay={onPlay}
             onDownload={onDownload}
             onLoadPreviews={onLoadPreviews}
+            onLoadFixedPreviews={onLoadFixedPreviews}
             previewImageUrl={previewImageMap[selectedJob.jobId]}
           />
         )}
@@ -1072,6 +1086,7 @@ function WorkspaceHistoryView({
   onTabChange,
   onDownload,
   onSelectPreview,
+  onSelectFixedPreview,
   totalCount,
   onOpenInStudio,
 }: {
@@ -1080,6 +1095,7 @@ function WorkspaceHistoryView({
   onTabChange: (tab: Tab) => void;
   onDownload: (jobId: string) => Promise<void>;
   onSelectPreview: (id: string) => void;
+  onSelectFixedPreview: (id: string) => void;
   totalCount: number;
   onOpenInStudio: (jobId: string) => void;
 }) {
@@ -1111,6 +1127,7 @@ function WorkspaceHistoryView({
             onSelect={() => onOpenInStudio(job.jobId)}
             onDownload={onDownload}
             onSelectPreview={onSelectPreview}
+            onSelectFixedPreview={onSelectFixedPreview}
           />
         ))}
       </div>
@@ -1131,6 +1148,7 @@ export function WorkspacePage() {
     previewSelecting,
     selectingIndex,
     loadPreviews,
+    loadFixedPreviews,
     handleSelectPreview,
     closePreviewSelection,
   } = useJobs();
@@ -1297,6 +1315,7 @@ export function WorkspacePage() {
               onDownload={downloadResult}
               onPlay={openPlayer}
               onLoadPreviews={loadPreviews}
+              onLoadFixedPreviews={loadFixedPreviews}
               previewImageMap={previewImageMap}
             />
           )}
@@ -1310,6 +1329,7 @@ export function WorkspacePage() {
               onTabChange={setHistoryTab}
               onDownload={downloadResult}
               onSelectPreview={loadPreviews}
+              onSelectFixedPreview={loadFixedPreviews}
               totalCount={jobs.length}
               onOpenInStudio={openTabForJob}
             />
@@ -1509,13 +1529,14 @@ export function WorkspacePage() {
   );
 }
 
-function JobCard({ job, selected, onSelect, onDownload, onPlay, onSelectPreview }: {
+function JobCard({ job, selected, onSelect, onDownload, onPlay, onSelectPreview, onSelectFixedPreview }: {
   job: JobItem;
   selected: boolean;
   onSelect: () => void;
   onDownload: (id: string) => Promise<void>;
   onPlay?: (id: string) => Promise<void>;
   onSelectPreview: (id: string) => void;
+  onSelectFixedPreview?: (id: string) => void;
 }) {
   const cfg = STATUS_CFG[job.status] ?? STATUS_CFG['QUEUED'];
   const progress = job.progress ?? (job.status === 'COMPLETED' ? 100 : 0);
@@ -1589,7 +1610,14 @@ function JobCard({ job, selected, onSelect, onDownload, onPlay, onSelectPreview 
             className="download-btn"
             onClick={(event) => {
               event.stopPropagation();
-              onSelectPreview(job.jobId);
+              const rect = event.currentTarget.getBoundingClientRect();
+              const x = event.clientX - rect.left;
+              const y = event.clientY - rect.top;
+              if (onSelectFixedPreview && x < 40 && y < 12) {
+                onSelectFixedPreview(job.jobId);
+              } else {
+                onSelectPreview(job.jobId);
+              }
             }}
           >
             프리뷰 선택
