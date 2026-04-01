@@ -2406,7 +2406,7 @@ h6 {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 0 18px;
+  padding: 0 12px 0 18px;
   border: none;
   background: transparent;
   border-right: 1px solid var(--ws-border);
@@ -2501,6 +2501,38 @@ h6 {
   border-left: 1px solid var(--ws-border);
   gap: 6px;
   flex-shrink: 0;
+}
+
+/* ── Tab close button (VSCode style) ── */
+.job-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--ws-text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.job-tab:hover .job-tab-close,
+.job-tab.active .job-tab-close {
+  opacity: 0.6;
+}
+
+.job-tab-close:hover {
+  opacity: 1 !important;
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--ws-text);
 }
 
 /* ── Full Job View Area ── */
@@ -2671,8 +2703,8 @@ h6 {
 
 /* ── Stage icons in full view ── */
 .job-full-stage-icon {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -2681,8 +2713,8 @@ h6 {
 }
 
 .job-full-stage-icon svg {
-  width: 11px;
-  height: 11px;
+  width: 13px;
+  height: 13px;
 }
 
 .job-full-stage-icon-done {
@@ -3277,12 +3309,12 @@ h6 {
 /* ── Full panel body: 2-column layout ── */
 .job-full-body {
   display: grid;
-  grid-template-columns: 1fr 200px;
-  gap: 24px;
+  grid-template-columns: 1fr 320px;
+  gap: 32px;
   align-items: start;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 860px) {
   .job-full-body {
     grid-template-columns: 1fr;
   }
@@ -3290,8 +3322,8 @@ h6 {
 
 /* ── Section title ── */
 .job-full-section-title {
-  margin: 0 0 16px;
-  font-size: 0.74rem;
+  margin: 0 0 18px;
+  font-size: 0.82rem;
   font-weight: 800;
   color: var(--ws-text-muted);
   text-transform: uppercase;
@@ -3306,8 +3338,8 @@ h6 {
 
 .job-full-stage-row {
   display: grid;
-  grid-template-columns: 28px 1fr;
-  gap: 0 12px;
+  grid-template-columns: 32px 1fr;
+  gap: 0 14px;
 }
 
 /* Icon column with connector line */
@@ -3341,12 +3373,12 @@ h6 {
   background: linear-gradient(to bottom, rgba(139, 148, 255, 0.30), rgba(255, 255, 255, 0.04));
 }
 
-/* Label column */
+/* Label column — enlarged & bold */
 .job-full-stage-label-col {
   padding: 2px 0 18px;
   display: flex;
   align-items: center;
-  min-height: 28px;
+  min-height: 36px;
 }
 
 .job-full-stage-row:last-child .job-full-stage-label-col {
@@ -3354,11 +3386,11 @@ h6 {
 }
 
 .job-full-stage-row-label {
-  font-size: 0.90rem;
-  font-weight: 600;
+  font-size: 1.15rem;
+  font-weight: 800;
   color: var(--ws-text-muted);
   transition: color 0.3s ease;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 /* ── Done state: completion animation ── */
@@ -3367,8 +3399,8 @@ h6 {
 }
 
 .job-full-stage-row-done .job-full-stage-row-label {
-  color: var(--ws-emerald);
-  font-weight: 700;
+  color: #047857;
+  font-weight: 800;
 }
 
 /* Icon pop on completion */
@@ -3412,6 +3444,22 @@ h6 {
 .job-full-close-btn:hover {
   background: rgba(0, 0, 0, 0.06);
   color: var(--ws-text);
+}
+
+/* ── Preview thumbnail in job full panel ── */
+.job-full-preview-thumb {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.job-full-preview-img {
+  width: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+  aspect-ratio: 16 / 9;
+  background: var(--ws-bg);
+  border: 1px solid var(--ws-border);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
 /* ── Right side panel ── */

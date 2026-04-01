@@ -20,6 +20,18 @@ export type TrackedJob = JobItem & {
   messageLog: string[];
 };
 
+/** 백엔드 메시지에서 기술 용어를 제거 */
+function cleanMessage(msg: string): string {
+  return msg
+    .replace(/S3에서\s*/g, '')
+    .replace(/Gemini\s*모델이\s*/g, '')
+    .replace(/Gemini\s+/g, '')
+    .replace(/Grounding\s*DINO\s*/g, '')
+    .replace(/\bSAM\b\s*/g, '')
+    .replace(/\bDINO\b\s*/g, '')
+    .trim();
+}
+
 export function useJobs() {
   const [jobs, setJobs] = useState<TrackedJob[]>([]);
   const [loadingJobs, setLoadingJobs] = useState(false);
@@ -47,7 +59,9 @@ export function useJobs() {
     setJobs((prev) =>
       prev.map((job) => {
         if (job.jobId !== data.jobId) return job;
-        const newMessage = data.message || null;
+        const rawMessage = data.message || null;
+        const cleaned = rawMessage ? cleanMessage(rawMessage) : null;
+        const newMessage = cleaned || rawMessage;
         const prevLog = job.messageLog ?? [];
         const messageLog =
           newMessage && newMessage !== prevLog[prevLog.length - 1]
@@ -71,7 +85,7 @@ export function useJobs() {
     setLoadingJobs(true);
 
     initSession()
-      .then(() => getJobs(0, 20))
+      .then(() => getJobs(0, 100))
       .then((data) => {
         if (!active) return;
         setJobs(
