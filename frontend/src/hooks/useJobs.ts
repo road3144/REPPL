@@ -195,6 +195,18 @@ export function useJobs() {
     }
   };
 
+  // 고정 프리뷰 (시연용 기믹)
+  const loadFixedPreviews = (jobId: string) => {
+    setPreviewSelecting({
+      jobId,
+      previews: [
+        { index: 0, key: 'fixed-0', url: '/images/preview_fixed_1.png' },
+        { index: 1, key: 'fixed-1', url: '/images/preview_fixed_2.png' },
+        { index: 2, key: 'fixed-2', url: '/images/preview_fixed_3.png' },
+      ],
+    });
+  };
+
   // 프리뷰 선택 → 합성 작업 시작 (compositeJobId 반환)
   const handleSelectPreview = async (previewJobId: string, selectedIndex: number): Promise<string | null> => {
     try {
@@ -244,6 +256,7 @@ export function useJobs() {
     previewSelecting,
     selectingIndex,
     loadPreviews,
+    loadFixedPreviews,
     handleSelectPreview,
     closePreviewSelection: () => setPreviewSelecting(null),
   };
