@@ -10,18 +10,18 @@ type JobStagePanelProps = {
 type StageTone = 'done' | 'current' | 'pending' | 'failed';
 
 const PREVIEW_STAGE_FLOW = [
-  { key: 'GEMINI', label: '첫 프레임 Gemini 합성' },
+  { key: 'GEMINI', label: '이미지 생성' },
 ];
 
 const COMPOSITE_STAGE_FLOW = [
   { key: 'DOWNLOAD', label: '입력 파일 다운로드' },
-  { key: 'DINO', label: 'Grounding DINO 객체 검출' },
-  { key: 'SAM', label: 'SAM 마스크 추출' },
+  { key: 'DINO', label: '객체 검출' },
+  { key: 'SAM', label: '마스크 추출' },
   { key: 'SHADOW', label: '그림자 생성' },
-  { key: 'SCALE', label: '객체 크기 조정' },
+  { key: 'SCALE', label: '크기 조정' },
   { key: 'DEPTH', label: '깊이 추정' },
-  { key: 'COMPOSITE', label: '전체 프레임 합성' },
-  { key: 'UPLOAD', label: '최종 합성 업로드' },
+  { key: 'COMPOSITE', label: '프레임 합성' },
+  { key: 'UPLOAD', label: '결과 업로드' },
 ];
 
 function getStageFlow(job: JobItem) {

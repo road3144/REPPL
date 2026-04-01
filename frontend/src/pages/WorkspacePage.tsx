@@ -26,18 +26,18 @@ const STATUS_CFG: Record<
 
 /* ── Stage flow data (mirrored from JobStagePanel) ── */
 const PREVIEW_STAGE_FLOW = [
-  { key: 'GEMINI', label: '첫 프레임 Gemini 합성' },
+  { key: 'GEMINI', label: '이미지 생성' },
 ] as const;
 
 const COMPOSITE_STAGE_FLOW = [
   { key: 'DOWNLOAD', label: '입력 파일 다운로드' },
-  { key: 'DINO', label: 'Grounding DINO 객체 검출' },
-  { key: 'SAM', label: 'SAM 마스크 추출' },
+  { key: 'DINO', label: '객체 검출' },
+  { key: 'SAM', label: '마스크 추출' },
   { key: 'SHADOW', label: '그림자 생성' },
-  { key: 'SCALE', label: '객체 크기 조정' },
+  { key: 'SCALE', label: '크기 조정' },
   { key: 'DEPTH', label: '깊이 추정' },
-  { key: 'COMPOSITE', label: '전체 프레임 합성' },
-  { key: 'UPLOAD', label: '최종 합성 업로드' },
+  { key: 'COMPOSITE', label: '프레임 합성' },
+  { key: 'UPLOAD', label: '결과 업로드' },
 ] as const;
 
 function getStageFlow(job: JobItem) {
@@ -93,13 +93,13 @@ function JobFullPanel({
   onPlay,
   onDownload,
   onLoadPreviews,
-  onClose,
+  previewImageUrl,
 }: {
   job: TrackedJob;
   onPlay: (id: string) => Promise<void>;
   onDownload: (id: string) => Promise<void>;
   onLoadPreviews: (id: string) => void;
-  onClose: () => void;
+  previewImageUrl?: string | null;
 }) {
   const progress = job.progress ?? (job.status === 'COMPLETED' ? 100 : 0);
   const isPreviewCompleted = job.jobType === 'PREVIEW' && job.status === 'COMPLETED';
@@ -159,7 +159,6 @@ function JobFullPanel({
           {job.status === 'RUNNING' && progress > 0 && (
             <span className="job-full-progress-pct">{progress}%</span>
           )}
-          <button type="button" className="job-full-close-btn" onClick={onClose} aria-label="패널 닫기">×</button>
         </div>
       </div>
 
@@ -171,7 +170,7 @@ function JobFullPanel({
         />
       </div>
 
-      {/* Body: stage timeline (left) + meta/actions (right) */}
+      {/* Body: stage timeline (left) + detail panel (right) */}
       <div className="job-full-body">
         {/* Left: vertical stage timeline */}
         <div>
@@ -204,8 +203,16 @@ function JobFullPanel({
           </div>
         </div>
 
-        {/* Right: meta info + action buttons */}
+        {/* Right: preview + meta + actions stacked vertically */}
         <div className="job-full-side">
+          {/* Preview image (composite only) */}
+          {previewImageUrl && (
+            <div className="job-full-preview-thumb">
+              <h4 className="job-full-section-title">선택된 프리뷰</h4>
+              <img src={previewImageUrl} alt="선택된 프리뷰" className="job-full-preview-img" />
+            </div>
+          )}
+
           <div className="job-full-meta-vertical">
             <div className="job-full-meta-item-sm">
               <span className="job-full-meta-label-sm">상태</span>
@@ -915,56 +922,62 @@ function WorkspaceStatusTabs({ tab, onChange }: { tab: Tab; onChange: (next: Tab
 }
 
 function WorkspaceStudioView({
-  filteredJobs,
   jobs,
   loadingJobs,
   selectedJobId,
-  tab,
-  onTabChange,
+  openTabIds,
   onSelectJob,
-  onDeselectJob,
+  onCloseTab,
   onPlay,
   onDownload,
   onLoadPreviews,
+  previewImageMap,
 }: {
-  filteredJobs: TrackedJob[];
   jobs: TrackedJob[];
   loadingJobs: boolean;
   selectedJobId: string | null;
-  tab: Tab;
-  onTabChange: (tab: Tab) => void;
+  openTabIds: Set<string>;
   onSelectJob: (id: string) => void;
-  onDeselectJob: () => void;
+  onCloseTab: (id: string) => void;
   onPlay: (id: string) => Promise<void>;
   onDownload: (id: string) => Promise<void>;
   onLoadPreviews: (id: string) => void;
+  previewImageMap: Record<string, string>;
 }) {
-  const selectedJob = jobs.find((job) => job.jobId === selectedJobId) ?? null;
+  const openJobs = useMemo(() => jobs.filter((j) => openTabIds.has(j.jobId)), [jobs, openTabIds]);
+  const selectedJob = jobs.find((job) => job.jobId === selectedJobId && openTabIds.has(job.jobId)) ?? null;
 
   return (
     <div className="workspace-studio-full">
       {/* Tab bar */}
       <div className="job-tab-bar">
         <div className="job-tabs-scroll">
-          {jobs.map((job) => {
+          {openJobs.map((job) => {
             const isActive = job.jobId === selectedJobId;
             const statusClass = `job-tab-${job.status.toLowerCase()}`;
             return (
-              <button
+              <div
                 key={job.jobId}
-                type="button"
                 className={`job-tab ${statusClass} ${isActive ? 'active' : ''}`}
                 onClick={() => onSelectJob(job.jobId)}
               >
                 <span className="job-tab-dot" />
                 <span className="job-tab-id">{job.jobId.slice(-10)}</span>
                 <span className="job-tab-type">{job.jobType === 'PREVIEW' ? 'PV' : 'CS'}</span>
-              </button>
+                <button
+                  type="button"
+                  className="job-tab-close"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCloseTab(job.jobId);
+                  }}
+                  aria-label="탭 닫기"
+                >
+                  ×
+                </button>
+              </div>
             );
           })}
-        </div>
-        <div className="job-tab-bar-filter">
-          <WorkspaceStatusTabs tab={tab} onChange={onTabChange} />
         </div>
       </div>
 
@@ -976,23 +989,13 @@ function WorkspaceStudioView({
           </div>
         )}
 
-        {!loadingJobs && jobs.length === 0 && (
+        {!loadingJobs && openJobs.length === 0 && (
           <div className="job-full-empty">
             <div className="job-full-empty-icon">
               <FileStackIcon />
             </div>
-            <h3>작업이 없습니다</h3>
-            <p>왼쪽 사이드바에서 새 작업을 만들어보세요</p>
-          </div>
-        )}
-
-        {!loadingJobs && jobs.length > 0 && filteredJobs.length === 0 && !selectedJob && (
-          <div className="job-full-empty">
-            <div className="job-full-empty-icon">
-              <FileStackIcon />
-            </div>
-            <h3>해당 상태의 작업이 없습니다</h3>
-            <p>필터를 변경하거나 위 탭에서 직접 작업을 선택하세요</p>
+            <h3>열린 작업이 없습니다</h3>
+            <p>작업 내역에서 작업을 클릭하면 이곳에 탭이 열립니다</p>
           </div>
         )}
 
@@ -1002,7 +1005,7 @@ function WorkspaceStudioView({
             onPlay={onPlay}
             onDownload={onDownload}
             onLoadPreviews={onLoadPreviews}
-            onClose={onDeselectJob}
+            previewImageUrl={previewImageMap[selectedJob.jobId]}
           />
         )}
       </div>
@@ -1133,9 +1136,10 @@ export function WorkspacePage() {
   } = useJobs();
 
   const [activeSection, setActiveSection] = useState<WorkspaceSection>('studio');
-  const [tab, setTab] = useState<Tab>('all');
   const [historyTab, setHistoryTab] = useState<Tab>('all');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [openTabIds, setOpenTabIds] = useState<Set<string>>(new Set());
+  const [previewImageMap, setPreviewImageMap] = useState<Record<string, string>>({});
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [guideModalOpen, setGuideModalOpen] = useState(false);
@@ -1151,6 +1155,19 @@ export function WorkspacePage() {
       setErrorMessage('영상 재생 URL을 가져올 수 없습니다.');
     }
   };
+
+  /* 진행 중/대기 중 작업은 자동으로 탭에 추가 */
+  useEffect(() => {
+    const activeIds = jobs
+      .filter((j) => j.status === 'RUNNING' || j.status === 'QUEUED')
+      .map((j) => j.jobId);
+    if (activeIds.length === 0) return;
+    setOpenTabIds((prev) => {
+      const hasAll = activeIds.every((id) => prev.has(id));
+      if (hasAll) return prev;
+      return new Set([...prev, ...activeIds]);
+    });
+  }, [jobs]);
 
   /* Detect status transitions */
   useEffect(() => {
@@ -1171,35 +1188,52 @@ export function WorkspacePage() {
       return;
     }
 
-    if (selectedJobId && jobs.some((job) => job.jobId === selectedJobId)) {
+    if (selectedJobId && jobs.some((job) => job.jobId === selectedJobId) && openTabIds.has(selectedJobId)) {
       return;
     }
 
-    const nextSelectedJob =
-      jobs.find((job) => job.status === 'RUNNING') ??
-      jobs.find((job) => job.status === 'QUEUED') ??
-      jobs[0];
-
-    setSelectedJobId(nextSelectedJob?.jobId ?? null);
-  }, [jobs, selectedJobId]);
-
-  const filteredJobs = useMemo(() => filterJobsByTab(jobs, tab), [jobs, tab]);
+    // Select first open tab if current selection is closed
+    const openJobs = jobs.filter((j) => openTabIds.has(j.jobId));
+    if (openJobs.length > 0) {
+      setSelectedJobId(openJobs[0].jobId);
+    } else {
+      setSelectedJobId(null);
+    }
+  }, [jobs, selectedJobId, openTabIds]);
   const historyFilteredJobs = useMemo(() => filterJobsByTab(jobs, historyTab), [jobs, historyTab]);
   const sidebarCounts = useMemo<Record<WorkspaceSection, number>>(
     () => ({
-      studio: jobs.filter((job) => job.status === 'RUNNING' || job.status === 'QUEUED').length,
+      studio: openTabIds.size,
       results: jobs.filter((job) => job.jobType === 'COMPOSITE' && job.status === 'COMPLETED').length,
       history: jobs.length,
     }),
-    [jobs]
+    [jobs, openTabIds]
   );
 
   const handleCreatedJob = (status: JobStatusResponse) => {
     prependCreatedJob(status);
+    setOpenTabIds((prev) => new Set([status.jobId, ...prev]));
     setActiveSection('studio');
     setSelectedJobId(status.jobId);
     setCreateModalOpen(false);
     setErrorMessage(null);
+  };
+
+  const openTabForJob = (jobId: string) => {
+    setOpenTabIds((prev) => new Set([...prev, jobId]));
+    setSelectedJobId(jobId);
+    setActiveSection('studio');
+  };
+
+  const closeTab = (jobId: string) => {
+    setOpenTabIds((prev) => {
+      const next = new Set(prev);
+      next.delete(jobId);
+      return next;
+    });
+    if (selectedJobId === jobId) {
+      setSelectedJobId(null);
+    }
   };
 
   const openCreateModal = () => {
@@ -1254,17 +1288,16 @@ export function WorkspacePage() {
         <main className="workspace-shell-content">
           {activeSection === 'studio' && (
             <WorkspaceStudioView
-              filteredJobs={filteredJobs}
               jobs={jobs}
               loadingJobs={loadingJobs}
               selectedJobId={selectedJobId}
-              tab={tab}
-              onTabChange={setTab}
-              onSelectJob={setSelectedJobId}
-              onDeselectJob={() => setSelectedJobId(null)}
+              openTabIds={openTabIds}
+              onSelectJob={(id) => setSelectedJobId(id)}
+              onCloseTab={closeTab}
               onDownload={downloadResult}
               onPlay={openPlayer}
               onLoadPreviews={loadPreviews}
+              previewImageMap={previewImageMap}
             />
           )}
           {activeSection === 'results' && (
@@ -1278,10 +1311,7 @@ export function WorkspacePage() {
               onDownload={downloadResult}
               onSelectPreview={loadPreviews}
               totalCount={jobs.length}
-              onOpenInStudio={(jobId) => {
-                setSelectedJobId(jobId);
-                setActiveSection('studio');
-              }}
+              onOpenInStudio={openTabForJob}
             />
           )}
         </main>
@@ -1461,8 +1491,13 @@ export function WorkspacePage() {
           previews={previewSelecting.previews}
           selecting={selectingIndex}
           onSelect={async (index) => {
+            const selectedPreview = previewSelecting.previews.find((p) => p.index === index);
             const compositeJobId = await handleSelectPreview(previewSelecting.jobId, index);
             if (compositeJobId) {
+              if (selectedPreview) {
+                setPreviewImageMap((prev) => ({ ...prev, [compositeJobId]: selectedPreview.url }));
+              }
+              setOpenTabIds((prev) => new Set([compositeJobId, ...prev]));
               setSelectedJobId(compositeJobId);
               setActiveSection('studio');
             }

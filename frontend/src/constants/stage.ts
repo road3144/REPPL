@@ -8,7 +8,7 @@ export const STAGE_LABEL: Record<string, string> = {
   SCALE: '크기 조정',
   DEPTH: '깊이 추정',
   COMPOSITE: '프레임 합성',
-  UPLOAD: '결과 업로드',
+  UPLOAD: '결과물 업로드',
 };
 
 export function formatStage(stage: string | null): string | null {
