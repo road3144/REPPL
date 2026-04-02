@@ -44,6 +44,7 @@ services:
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       SESSION_TIMEOUT: 86400s
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_CONSUMER_GROUP_ID: reppl-spring
@@ -64,14 +65,21 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis
-    ports:
-      - "6379:6379"
+    # ports 제거: Docker 내부 통신만 사용. 외부 노출 차단 (보안 침해 원인이었음)
     command: >
       redis-server
       --appendonly yes
       --appendfsync everysec
       --save 900 1
       --save 300 10
+      --requirepass ${REDIS_PASSWORD}
+      --protected-mode yes
+      --rename-command FLUSHALL ""
+      --rename-command FLUSHDB ""
+      --rename-command SLAVEOF ""
+      --rename-command REPLICAOF ""
+      --rename-command CONFIG ""
+      --rename-command DEBUG ""
     volumes:
       - redis_data:/data
     restart: unless-stopped
