@@ -107,7 +107,8 @@ public class JobController {
         log.info("Select preview request: jobId={}, selectedIndex={}", jobId, request.getSelectedIndex());
 
         PreviewSelectResponse response = jobService.selectPreviewAndStartComposite(
-                sessionId, jobId, request.getSelectedIndex());
+                sessionId, jobId, request.getSelectedIndex(),
+                request.getVideoKey(), request.getRefImageKey());
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response));

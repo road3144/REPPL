@@ -24,4 +24,10 @@ public class PreviewSelectRequest {
     @Min(value = 0, message = "selectedIndex는 0 이상이어야 합니다.")
     @Max(value = 2, message = "selectedIndex는 2 이하여야 합니다.")
     private Integer selectedIndex;
+
+    /** 고정 프리뷰용: 지정 시 프리뷰 Job의 videoKey 대신 사용 */
+    private String videoKey;
+
+    /** 고정 프리뷰용: 지정 시 프리뷰 Job의 previewKey 대신 사용 */
+    private String refImageKey;
 }
