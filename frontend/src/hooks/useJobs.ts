@@ -213,19 +213,24 @@ export function useJobs() {
     try {
       setSelectingIndex(true);
 
-      const overrides = previewSelecting?.fixed
+      const isFixed = previewSelecting?.fixed ?? false;
+      const overrides = isFixed
         ? {
             videoKey: FIXED_VIDEO_KEY,
             refImageKey: FIXED_PREVIEWS[selectedIndex]?.key,
           }
         : undefined;
 
+      console.log('[handleSelectPreview]', { previewJobId, selectedIndex, isFixed, overrides });
+
       const result = await selectPreview(previewJobId, selectedIndex, overrides);
+      console.log('[handleSelectPreview] result', result);
       const compositeStatus = await getJobStatus(result.compositeJobId);
       prependCreatedJob(compositeStatus);
       setPreviewSelecting(null);
       return result.compositeJobId;
     } catch (error: unknown) {
+      console.error('[handleSelectPreview] error', error);
       setErrorMessage(error instanceof Error ? error.message : '프리뷰 선택에 실패했습니다.');
       return null;
     } finally {
