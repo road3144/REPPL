@@ -49,9 +49,17 @@ export async function getPreviewUrls(jobId: string): Promise<PreviewListResponse
   return apiFetch<PreviewListResponse>(`/api/v1/jobs/${jobId}/previews`);
 }
 
-export async function selectPreview(jobId: string, selectedIndex: number): Promise<PreviewSelectResponse> {
+export async function selectPreview(
+  jobId: string,
+  selectedIndex: number,
+  overrides?: { videoKey?: string; refImageKey?: string },
+): Promise<PreviewSelectResponse> {
   return apiFetch<PreviewSelectResponse>(`/api/v1/jobs/${jobId}/select`, {
     method: 'POST',
-    body: JSON.stringify({ selectedIndex }),
+    body: JSON.stringify({
+      selectedIndex,
+      ...(overrides?.videoKey && { videoKey: overrides.videoKey }),
+      ...(overrides?.refImageKey && { refImageKey: overrides.refImageKey }),
+    }),
   });
 }
