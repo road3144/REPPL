@@ -184,7 +184,8 @@ public class JobService {
                 .build();
     }
 
-    public PreviewSelectResponse selectPreviewAndStartComposite(String sessionId, String previewJobId, int selectedIndex) {
+    public PreviewSelectResponse selectPreviewAndStartComposite(String sessionId, String previewJobId, int selectedIndex,
+                                                                   String overrideVideoKey, String overrideRefImageKey) {
         // 프리뷰 Job 검증
         JobState previewState = jobRedisRepository.findJobState(previewJobId)
                 .orElseThrow(() -> new JobNotFoundException(previewJobId));
@@ -202,7 +203,10 @@ public class JobService {
             throw new IllegalArgumentException("유효하지 않은 프리뷰 인덱스: " + selectedIndex);
         }
 
-        String selectedPreviewKey = previewKeys.get(selectedIndex);
+        String selectedPreviewKey = (overrideRefImageKey != null && !overrideRefImageKey.isBlank())
+                ? overrideRefImageKey : previewKeys.get(selectedIndex);
+        String videoKey = (overrideVideoKey != null && !overrideVideoKey.isBlank())
+                ? overrideVideoKey : previewState.getVideoKey();
 
         // 합성 Job 생성
         String compositeJobId = generateJobId();
@@ -223,7 +227,7 @@ public class JobService {
                 .jobType("COMPOSITE")
                 .status(JobStatus.QUEUED)
                 .progress(0)
-                .videoKey(previewState.getVideoKey())
+                .videoKey(videoKey)
                 .refImageKeys(List.of(selectedPreviewKey))
                 .optionsJson(toJson(options))
                 .createdAt(now)
@@ -240,7 +244,7 @@ public class JobService {
                 .requestedAt(now)
                 .video(JobRequestEvent.S3Location.builder()
                         .bucket(s3Bucket)
-                        .key(previewState.getVideoKey())
+                        .key(videoKey)
                         .build())
                 .selectedPreview(JobRequestEvent.S3Location.builder()
                         .bucket(s3Bucket)
