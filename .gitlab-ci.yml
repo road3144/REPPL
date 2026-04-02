@@ -43,9 +43,10 @@ deploy:
     - cp docker-compose.yml ~/app/docker-compose.yml
     - cp nginx/nginx.conf ~/app/nginx/nginx.conf
     - |
-      printf 'BACKEND_IMAGE=%s\nFRONTEND_IMAGE=%s\nTAG=%s\nEC2_HOST=%s\nAWS_ACCESS_KEY=%s\nAWS_SECRET_KEY=%s\nAWS_REGION=%s\nAWS_S3_BUCKET=%s\n' \
+      printf 'BACKEND_IMAGE=%s\nFRONTEND_IMAGE=%s\nTAG=%s\nEC2_HOST=%s\nAWS_ACCESS_KEY=%s\nAWS_SECRET_KEY=%s\nAWS_REGION=%s\nAWS_S3_BUCKET=%s\nREDIS_PASSWORD=%s\n' \
         "$BACKEND_IMAGE" "$FRONTEND_IMAGE" "$CI_COMMIT_SHORT_SHA" "$EC2_HOST" \
         "$AWS_ACCESS_KEY" "$AWS_SECRET_KEY" "$AWS_REGION" "$AWS_S3_BUCKET" \
+        "$REDIS_PASSWORD" \
         > ~/app/.env
     - cd ~/app
     # external 볼륨이 없으면 생성 (최초 배포 대응)
