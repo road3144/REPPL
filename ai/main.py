@@ -1167,35 +1167,515 @@ def _shape_prior_score(bb, frame_w, frame_h):
 def _compute_preview_anchor_bbox(first_frame, generated_frame, keyword):
     """
     selected preview 이미지에서 1차 anchor bbox를 계산한다.
-    사용자 ROI가 없어도 먼저 coarse diff region을 만들고,
-    그 영역 안(또는 충분히 겹치는) DINO 후보만 허용해 선반/벽체로 튀는 것을 줄인다.
+
+    주 경로: DINO(keyword) + Diff map 겹침도 기반
+    폴백: coarse diff bbox
     """
-    log.info("preview anchor bbox 계산 중...")
+    log.info(f"preview anchor bbox 계산 중... (keyword='{keyword}')")
     try:
+        # ── DINO + Diff 겹침으로 anchor 결정 ──
+        diff_map, _ = _build_diff_map(first_frame, generated_frame)
+        diff_thr = max(8.0, float(np.percentile(diff_map, 80)))
+        diff_binary = (diff_map >= diff_thr).astype(np.uint8) * 255
+
+        try:
+            dino_bboxes = _dino_detect(generated_frame, keyword)
+        except Exception:
+            dino_bboxes = []
+
+        best_bbox = None
+        best_score = -1
+        best_overlap = 0.0
+
+        if dino_bboxes:
+            for bbox in dino_bboxes:
+                x, y, bw, bh = bbox
+                if bw <= 0 or bh <= 0:
+                    continue
+                roi_diff_bin = diff_binary[y:y+bh, x:x+bw]
+                overlap = cv2.countNonZero(roi_diff_bin)
+                overlap_ratio = overlap / max(1, bw * bh)
+                roi_diff = diff_map[y:y+bh, x:x+bw]
+                mean_diff = float(roi_diff.mean()) if roi_diff.size > 0 else 0
+                score = mean_diff * overlap_ratio * (max(1, bw * bh) ** 0.3)
+                log.info(f"  anchor 후보: bbox={bbox}, diff_overlap={overlap_ratio:.2f}, "
+                         f"mean_diff={mean_diff:.1f}, score={score:.0f}")
+                if score > best_score:
+                    best_score = score
+                    best_bbox = bbox
+                    best_overlap = overlap_ratio
+
+        # DINO 후보의 diff 겹침이 충분하면 사용
+        if best_bbox is not None and best_overlap >= 0.15:
+            log.info(f"preview anchor bbox 확정(hybrid): {best_bbox}")
+            return best_bbox
+
+        # DINO 신뢰 불가 → coarse diff (가장 큰 변화 영역)
+        if best_bbox is not None:
+            log.info(f"DINO anchor diff_overlap={best_overlap:.2f} < 0.15 → coarse diff 폴백")
+
         coarse_bbox = _coarse_change_bbox(first_frame, generated_frame)
-        if coarse_bbox is None:
-            diff_result = _semantic_diff_analyze(first_frame, generated_frame, keyword, anchor_bbox=None)
-            if diff_result is not None:
-                anchor_bbox, _ = diff_result
-                log.info(f"preview anchor bbox 확정(no coarse): {anchor_bbox}")
-                return anchor_bbox
-            return None
+        if coarse_bbox is not None:
+            log.info(f"preview anchor bbox fallback(coarse): {coarse_bbox}")
+            return coarse_bbox
 
-        diff_result = _semantic_diff_analyze(first_frame, generated_frame, keyword, anchor_bbox=coarse_bbox)
-        if diff_result is not None:
-            anchor_bbox, _ = diff_result
-            log.info(f"preview anchor bbox 확정: {anchor_bbox}")
-            return anchor_bbox
-
-        log.info(f"preview anchor bbox fallback(coarse): {coarse_bbox}")
-        return coarse_bbox
+        return None
     except Exception as e:
         log.warning(f"preview anchor bbox 계산 실패: {e}")
         return None
 
+# ══════════════════════════════════════════════════════════════
+# Diff-First 파이프라인 (고도화)
+# ══════════════════════════════════════════════════════════════
+
+def _build_diff_map(first_frame, generated_frame):
+    """
+    원본 vs 합성 프레임의 고품질 차이 맵을 생성한다.
+    LAB + Gray 가중 합산, multi-scale Gaussian으로 노이즈 억제.
+
+    반환: (diff_map float32, f1_aligned)
+    """
+    h2, w2 = generated_frame.shape[:2]
+    if first_frame.shape[:2] != (h2, w2):
+        f1 = cv2.resize(first_frame, (w2, h2), interpolation=cv2.INTER_AREA)
+    else:
+        f1 = first_frame
+
+    # Multi-scale: 작은 블러(디테일) + 큰 블러(구조) 합산
+    scores = []
+    for ksize in [(5, 5), (11, 11), (21, 21)]:
+        b1 = cv2.GaussianBlur(f1, ksize, 0)
+        b2 = cv2.GaussianBlur(generated_frame, ksize, 0)
+        lab1 = cv2.cvtColor(b1, cv2.COLOR_BGR2Lab).astype(np.float32)
+        lab2 = cv2.cvtColor(b2, cv2.COLOR_BGR2Lab).astype(np.float32)
+        diff_l = cv2.absdiff(lab1[:, :, 0], lab2[:, :, 0])
+        diff_ab = cv2.magnitude(
+            cv2.absdiff(lab1[:, :, 1], lab2[:, :, 1]),
+            cv2.absdiff(lab1[:, :, 2], lab2[:, :, 2]),
+        )
+        gray1 = cv2.cvtColor(b1, cv2.COLOR_BGR2GRAY).astype(np.float32)
+        gray2 = cv2.cvtColor(b2, cv2.COLOR_BGR2GRAY).astype(np.float32)
+        diff_gray = cv2.absdiff(gray1, gray2)
+        s = 0.20 * diff_l + 0.56 * diff_ab + 0.24 * diff_gray
+        scores.append(s)
+
+    # 가중 합산: 큰 블러(구조)에 약간 더 무게
+    diff_map = 0.25 * scores[0] + 0.35 * scores[1] + 0.40 * scores[2]
+    return diff_map, f1
+
+
+
+def _sam_segment_with_points(frame, fg_points, bg_points=None, bbox_hint=None):
+    """
+    SAM에 포인트 프롬프트(+ 선택적 bbox 힌트)를 전달하여 정밀 마스크를 추출한다.
+    DINO bbox 없이도 동작한다.
+
+    Args:
+        frame: BGR 이미지
+        fg_points: foreground 좌표 [(x,y), ...]
+        bg_points: background 좌표 [(x,y), ...] (선택)
+        bbox_hint: (x,y,w,h) bbox 힌트 (선택 — diff 영역 bbox 사용)
+
+    반환: binary mask (uint8)
+    """
+    fh, fw = frame.shape[:2]
+    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    coords = []
+    labels = []
+
+    for px, py in fg_points:
+        coords.append([np.clip(px, 0, fw - 1), np.clip(py, 0, fh - 1)])
+        labels.append(1)
+
+    if bg_points:
+        for px, py in bg_points:
+            coords.append([np.clip(px, 0, fw - 1), np.clip(py, 0, fh - 1)])
+            labels.append(0)
+    elif bbox_hint is not None:
+        # bbox 바깥 4방향에 background 포인트 자동 생성
+        bx, by, bw, bh = bbox_hint
+        bcx, bcy = bx + bw // 2, by + bh // 2
+        m = 25
+        for bxp, byp in [
+            (bcx, max(0, by - m)),
+            (bcx, min(fh - 1, by + bh + m)),
+            (max(0, bx - m), bcy),
+            (min(fw - 1, bx + bw + m), bcy),
+        ]:
+            coords.append([bxp, byp])
+            labels.append(0)
+
+    coords_arr = np.array(coords)
+    labels_arr = np.array(labels)
+
+    box_arr = None
+    if bbox_hint is not None:
+        bx, by, bw, bh = bbox_hint
+        box_arr = np.array([bx, by, bx + bw, by + bh])
+
+    if SAM_VER == "sam2":
+        predictor = SAM2ImagePredictor.from_pretrained(
+            _SAM2_HF_MODEL_MAP[SAM_TYPE]
+        )
+        predictor.set_image(rgb)
+        predict_kwargs = {"multimask_output": True}
+        if box_arr is not None:
+            predict_kwargs["box"] = box_arr
+        if len(coords) > 0:
+            predict_kwargs["point_coords"] = coords_arr
+            predict_kwargs["point_labels"] = labels_arr
+        masks, scores, _ = predictor.predict(**predict_kwargs)
+    else:
+        sam = sam_model_registry[SAM_TYPE](checkpoint=SAM_CKPT)
+        sam.to(device)
+        predictor = SamPredictor(sam)
+        predictor.set_image(rgb)
+        predict_kwargs = {"multimask_output": True}
+        if len(coords) > 0:
+            predict_kwargs["point_coords"] = coords_arr
+            predict_kwargs["point_labels"] = labels_arr
+        if box_arr is not None:
+            predict_kwargs["box"] = box_arr[None, :]
+        masks, scores, _ = predictor.predict(**predict_kwargs)
+
+    best = (masks[np.argmax(scores)] * 255).astype(np.uint8)
+    log.info(f"[DiffFirst] SAM ✅: score={scores.max():.4f}, "
+             f"fg={len(fg_points)}pts, bg={len(bg_points) if bg_points else 0}pts")
+
+    if SAM_VER != "sam2":
+        del sam
+    del predictor
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    return _largest_cc(best)
+
+
+def _diff_primary_extract(first_frame, generated_frame, keyword, anchor_bbox=None):
+    """
+    DINO + Diff 동등 결합 객체 추출 파이프라인.
+
+    핵심 원리:
+      - DINO가 keyword(냉장고)를 아는 후보를 찾음 → "뭘 찾아야 하는지"
+      - Diff map이 실제 변화 영역을 보여줌 → "어디가 바뀌었는지"
+      - 두 시그널이 겹치는 곳이 정답
+
+    1단계: DINO로 키워드 기반 후보 탐지
+    2단계: Diff map으로 변화량 측정
+    3단계: 각 DINO 후보의 diff 겹침도 계산 → 복합 스코어
+    4단계: 최고 스코어 후보 → SAM 정밀 세그먼트
+
+    반환:
+        (combined_mask, object_extent_bbox)  또는  None (실패 시)
+    """
+    h2, w2 = generated_frame.shape[:2]
+
+    log.info("[Hybrid] ===== DINO+Diff 하이브리드 추출 시작 =====")
+
+    # ── 1단계: DINO 키워드 탐지 ──
+    try:
+        dino_bboxes = _dino_detect(generated_frame, keyword)
+        log.info(f"[Hybrid] DINO '{keyword}' 탐지: {len(dino_bboxes)}개")
+    except Exception as e:
+        log.warning(f"[Hybrid] DINO 실패: {e} → 폴백 필요")
+        return None
+
+    if not dino_bboxes:
+        return None
+
+    # ── 2단계: 고품질 Diff map ──
+    diff_map, _ = _build_diff_map(first_frame, generated_frame)
+    cv2.imwrite(os.path.join(OUTPUTS, "diff_map_normalized.png"),
+                np.clip(diff_map / max(1, diff_map.max()) * 255, 0, 255).astype(np.uint8))
+
+    # 변화 영역 이진화 (핫포인트 추출용)
+    diff_thr = max(8.0, float(np.percentile(diff_map, 80)))
+    diff_binary = (diff_map >= diff_thr).astype(np.uint8) * 255
+    diff_binary = cv2.morphologyEx(diff_binary, cv2.MORPH_CLOSE,
+                                   np.ones((5, 5), np.uint8), iterations=2)
+
+    # ── 3단계: 각 DINO 후보에 대해 diff 겹침도 계산 ──
+    scored_candidates = []
+
+    for i, bbox in enumerate(dino_bboxes):
+        x, y, bw, bh = bbox
+        if bw <= 0 or bh <= 0:
+            continue
+
+        # bbox 내부의 diff 통계
+        roi_diff = diff_map[y:y+bh, x:x+bw]
+        if roi_diff.size == 0:
+            continue
+
+        # 상위 1/3 강한 변화의 평균 (전체 평균보다 robust)
+        flat = np.sort(roi_diff.flatten())[::-1]
+        top_k = max(1, len(flat) // 3)
+        top_mean_diff = float(flat[:top_k].mean())
+
+        # diff 영역과 bbox의 겹침 비율
+        roi_diff_bin = diff_binary[y:y+bh, x:x+bw]
+        diff_overlap_px = cv2.countNonZero(roi_diff_bin)
+        diff_overlap_ratio = diff_overlap_px / max(1, bw * bh)
+
+        # bbox 내부 diff 핫포인트 추출 (SAM용)
+        hot_thr = max(diff_thr, float(np.percentile(roi_diff, 75)))
+        hot_mask = roi_diff >= hot_thr
+        ys, xs = np.where(hot_mask)
+        hotpoints = []
+        if len(xs) > 0:
+            coords_arr = np.column_stack([xs, ys]).astype(np.float32)
+            n_pts = min(5, len(coords_arr))
+            if n_pts >= 2:
+                criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
+                            10, 1.0)
+                _, _, centers = cv2.kmeans(
+                    coords_arr, n_pts, None, criteria, 3, cv2.KMEANS_PP_CENTERS,
+                )
+                for cx, cy in centers:
+                    hotpoints.append((int(x + cx), int(y + cy)))
+            else:
+                hotpoints.append((int(x + xs[0]), int(y + ys[0])))
+        # 중심점 항상 포함
+        hotpoints.insert(0, (x + bw // 2, y + bh // 2))
+
+        # ── 복합 스코어 계산 ──
+        # diff 겹침이 핵심: 실제로 변한 DINO 후보가 정답
+        score = top_mean_diff * (diff_overlap_ratio ** 0.5) * (max(1, bw * bh) ** 0.3)
+
+        # shape prior (적절한 크기/형태 보너스)
+        area_ratio = (bw * bh) / (w2 * h2)
+        if 0.01 <= area_ratio <= 0.20:
+            score *= 1.3
+        elif area_ratio > 0.40:
+            score *= 0.4
+
+        # 가장자리 패널티
+        if x <= 2 or y <= 2 or x + bw >= w2 - 2 or y + bh >= h2 - 2:
+            score *= 0.5
+
+        # anchor 거리 보너스
+        if anchor_bbox is not None:
+            dist = _bbox_center_distance_norm(bbox, anchor_bbox, w2, h2)
+            iou = _bbox_iou_xywh(bbox, anchor_bbox)
+            score += iou * 3000.0
+            if dist < 0.1:
+                score *= 1.5
+            elif dist > 0.35:
+                score *= 0.4
+
+        scored_candidates.append({
+            "bbox": bbox,
+            "score": score,
+            "top_mean_diff": top_mean_diff,
+            "diff_overlap": diff_overlap_ratio,
+            "hotpoints": hotpoints,
+            "area_ratio": area_ratio,
+        })
+
+        log.info(
+            f"[Hybrid] 후보 {i+1}: bbox={bbox}, "
+            f"diff_mean={top_mean_diff:.1f}, diff_overlap={diff_overlap_ratio:.2f}, "
+            f"area={area_ratio:.3f}, score={score:.0f}"
+        )
+
+    if not scored_candidates:
+        log.warning("[Hybrid] DINO 후보 없음 → diff-only 폴백")
+        scored_candidates = []  # 아래 diff-only로 진행
+
+    # ── 4단계: DINO 후보 신뢰도 확인 → 낮으면 diff-only 폴백 ──
+    best = None
+    if scored_candidates:
+        scored_candidates.sort(key=lambda c: c["score"], reverse=True)
+        best = scored_candidates[0]
+
+        # DINO 후보의 diff 겹침이 너무 낮으면 → DINO가 잘못 잡은 것
+        if best["diff_overlap"] < 0.15:
+            log.warning(
+                f"[Hybrid] DINO 최고 후보 diff_overlap={best['diff_overlap']:.2f} < 0.15 "
+                f"→ DINO 신뢰 불가, diff-only 폴백"
+            )
+            best = None
+
+    if best is not None:
+        log.info(
+            f"[Hybrid] ===== DINO+Diff 최종 선택 =====\n"
+            f"  bbox={best['bbox']}, score={best['score']:.0f}, "
+            f"diff_mean={best['top_mean_diff']:.1f}, "
+            f"diff_overlap={best['diff_overlap']:.2f}"
+        )
+    else:
+        # ── Diff-only 폴백 ──
+        # anchor가 있으면 anchor를 직접 사용 (coarse_change_bbox가 이미 정확한 경우가 많음)
+        if anchor_bbox is not None:
+            ax, ay, aw, ah = anchor_bbox
+            log.info(f"[Hybrid] Diff-only: anchor bbox 직접 사용 → {anchor_bbox}")
+
+            # anchor 내부 diff 핫포인트 추출
+            roi_diff = diff_map[ay:ay+ah, ax:ax+aw]
+            hot_thr = max(8.0, float(np.percentile(roi_diff, 70))) if roi_diff.size > 0 else 8.0
+            ys, xs = np.where(roi_diff >= hot_thr) if roi_diff.size > 0 else ([], [])
+            hotpoints = []
+            if len(xs) > 0:
+                coords_arr = np.column_stack([xs, ys]).astype(np.float32)
+                n_pts = min(5, len(coords_arr))
+                if n_pts >= 2:
+                    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
+                                10, 1.0)
+                    _, _, centers = cv2.kmeans(
+                        coords_arr, n_pts, None, criteria, 3, cv2.KMEANS_PP_CENTERS,
+                    )
+                    for cx, cy in centers:
+                        hotpoints.append((int(ax + cx), int(ay + cy)))
+                else:
+                    hotpoints.append((int(ax + xs[0]), int(ay + ys[0])))
+            hotpoints.insert(0, (ax + aw // 2, ay + ah // 2))
+
+            best = {
+                "bbox": anchor_bbox,
+                "score": 0,
+                "top_mean_diff": float(roi_diff.mean()) if roi_diff.size > 0 else 0,
+                "diff_overlap": 1.0,
+                "hotpoints": hotpoints,
+                "area_ratio": (aw * ah) / (w2 * h2),
+            }
+            log.info(
+                f"[Hybrid] ===== Anchor-direct 최종 선택 =====\n"
+                f"  bbox={anchor_bbox}, area={best['area_ratio']:.3f}, "
+                f"hotpoints={len(hotpoints)}개"
+            )
+        else:
+            log.info("[Hybrid] Diff-only 폴백: diff map에서 직접 객체 영역 추출 (anchor 없음)")
+
+            # 적응적 이중 임계값으로 변화 영역 추출
+            diff_thr_high = max(10.0, float(np.percentile(diff_map, 88)))
+            diff_thr_low = max(6.0, diff_thr_high * 0.5)
+
+            strong = (diff_map >= diff_thr_high).astype(np.uint8) * 255
+            weak = (diff_map >= diff_thr_low).astype(np.uint8) * 255
+            strong = cv2.morphologyEx(strong, cv2.MORPH_CLOSE,
+                                      np.ones((5, 5), np.uint8), iterations=2)
+            dilated = cv2.dilate(strong, np.ones((9, 9), np.uint8), iterations=2)
+            expanded_mask = cv2.bitwise_or(strong, cv2.bitwise_and(dilated, weak))
+            expanded_mask = cv2.morphologyEx(expanded_mask, cv2.MORPH_CLOSE,
+                                             np.ones((7, 7), np.uint8), iterations=2)
+            expanded_mask = cv2.morphologyEx(expanded_mask, cv2.MORPH_OPEN,
+                                             np.ones((5, 5), np.uint8), iterations=1)
+
+            n_labels, labels, stats, _ = cv2.connectedComponentsWithStats(expanded_mask, 8)
+            best_region_idx = -1
+            best_region_score = -1
+            img_area = float(w2 * h2)
+
+            for ri in range(1, n_labels):
+                area = stats[ri, cv2.CC_STAT_AREA]
+                area_ratio = area / img_area
+                if area_ratio < 0.002 or area_ratio > 0.45:
+                    continue
+                sx = stats[ri, cv2.CC_STAT_LEFT]
+                sy = stats[ri, cv2.CC_STAT_TOP]
+                sw = stats[ri, cv2.CC_STAT_WIDTH]
+                sh = stats[ri, cv2.CC_STAT_HEIGHT]
+                if sw > w2 * 0.85 and sh > h2 * 0.85:
+                    continue
+                comp_mask = (labels == ri)
+                top_diff = float(np.percentile(diff_map[comp_mask], 90))
+                rscore = top_diff * (min(area, img_area * 0.15) ** 0.35)
+                if sx <= 2 or sy <= 2 or sx + sw >= w2 - 2 or sy + sh >= h2 - 2:
+                    rscore *= 0.5
+                if area_ratio > 0.10:
+                    rscore *= max(0.2, 1.0 - (area_ratio - 0.10) * 5.0)
+                log.info(f"  diff영역 {ri}: bbox=({sx},{sy},{sw},{sh}), "
+                         f"area={area_ratio:.3f}, top_diff={top_diff:.1f}, score={rscore:.0f}")
+                if rscore > best_region_score:
+                    best_region_score = rscore
+                    best_region_idx = ri
+
+            if best_region_idx < 0:
+                log.warning("[Hybrid] diff-only에서도 유효한 영역 없음 → 실패")
+                return None
+
+            rx = stats[best_region_idx, cv2.CC_STAT_LEFT]
+            ry = stats[best_region_idx, cv2.CC_STAT_TOP]
+            rw = stats[best_region_idx, cv2.CC_STAT_WIDTH]
+            rh = stats[best_region_idx, cv2.CC_STAT_HEIGHT]
+            diff_bbox = (rx, ry, rw, rh)
+
+            region_mask = (labels == best_region_idx)
+            region_diffs = diff_map.copy()
+            region_diffs[~region_mask] = 0
+            hot_thr = max(diff_thr_high, float(np.percentile(diff_map[region_mask], 75)))
+            ys, xs = np.where(region_diffs >= hot_thr)
+            hotpoints = []
+            if len(xs) > 0:
+                coords_arr = np.column_stack([xs, ys]).astype(np.float32)
+                n_pts = min(5, len(coords_arr))
+                if n_pts >= 2:
+                    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER,
+                                10, 1.0)
+                    _, _, centers = cv2.kmeans(
+                        coords_arr, n_pts, None, criteria, 3, cv2.KMEANS_PP_CENTERS,
+                    )
+                    for cx, cy in centers:
+                        hotpoints.append((int(cx), int(cy)))
+                else:
+                    hotpoints.append((int(xs[0]), int(ys[0])))
+            hotpoints.insert(0, (rx + rw // 2, ry + rh // 2))
+
+            best = {
+                "bbox": diff_bbox,
+                "score": best_region_score,
+                "top_mean_diff": float(np.percentile(diff_map[region_mask], 90)),
+                "diff_overlap": 1.0,
+                "hotpoints": hotpoints,
+                "area_ratio": (rw * rh) / (w2 * h2),
+            }
+            log.info(
+                f"[Hybrid] ===== Diff-only 최종 선택 =====\n"
+                f"  bbox={diff_bbox}, score={best_region_score:.0f}, "
+                f"area={best['area_ratio']:.3f}, hotpoints={len(hotpoints)}개"
+            )
+
+    # ── SAM 세그먼트 ──
+    try:
+        expanded = _expand_bbox(best["bbox"], w2, h2, pad_ratio=0.06, min_pad=10)
+        mask = _sam_segment_with_points(
+            generated_frame,
+            fg_points=best["hotpoints"][:7],
+            bbox_hint=expanded,
+        )
+        mask = _refine_mask(mask, generated_frame, expanded)
+    except Exception as e:
+        log.warning(f"[Hybrid] SAM 실패: {e} → bbox 기반 SAM 폴백")
+        try:
+            mask = _sam_segment(generated_frame, best["bbox"],
+                                fg_points=best["hotpoints"][:5])
+            mask = _refine_mask(mask, generated_frame, best["bbox"])
+        except Exception as e2:
+            log.error(f"[Hybrid] SAM 폴백도 실패: {e2}")
+            return None
+
+    mask_px = cv2.countNonZero(mask)
+    if mask_px < 30:
+        log.warning(f"[Hybrid] 마스크 너무 작음: {mask_px}px → 실패")
+        return None
+
+    # 마스크 bbox 재계산
+    coords = cv2.findNonZero(mask)
+    if coords is not None:
+        final_bbox = cv2.boundingRect(coords)
+    else:
+        final_bbox = best["bbox"]
+
+    log.info(f"[Hybrid] 최종 마스크: {mask_px}px, bbox={final_bbox}")
+    cv2.imwrite(os.path.join(OUTPUTS, "hybrid_extract_mask.png"), mask)
+    return mask, final_bbox
+
+
 def _semantic_diff_analyze(first_frame, generated_frame, keyword, anchor_bbox=None):
     """
-    단순 전역 픽셀 비교가 아닌 의미론적(Semantic) 비교를 수행한다.
+    [LEGACY] DINO 주도 의미론적 비교. diff_primary_extract의 fallback으로 사용.
     1. DINO를 사용하여 합성 이미지에서 객체 후보(BBox)들을 찾는다.
     2. 각 후보 BBox 내부에서만 원본 대비 픽셀 변화량을 측정한다.
     3. anchor_bbox가 있으면 그 근처 후보를 강하게 우선한다.
@@ -1321,6 +1801,189 @@ def _semantic_diff_analyze(first_frame, generated_frame, keyword, anchor_bbox=No
     log.info(f"선택 완료! 새로운 객체: BBox={best_bbox}, fg_points={len(best_fg_points)}개")
     return best_bbox, best_fg_points
 
+
+# ── 사라진 전경 객체 복원 ──
+_VANISHED_FG_KEYWORDS = (
+    "chair . stool . bench . table . desk . "
+    "shelf . cabinet . drawer . "
+    "plant . pot . vase . lamp . "
+    "box . basket . bag . bottle . cup . "
+    "furniture . stand . rack"
+)
+
+
+def _extract_vanished_foreground_mask(first_frame, generated_frame,
+                                      object_visible_mask, object_extent_bbox):
+    """
+    Gemini가 합성 과정에서 제거한 전경 객체(의자, 화분 등)를 감지한다.
+
+    알고리즘:
+      1) 원본 vs 생성 프레임의 고변화 영역에서 새 객체 마스크를 제외 → "사라진 영역"
+      2) DINO로 원본 프레임에서 해당 영역의 객체를 탐지 → SAM으로 정밀 세그먼트
+      3) Fallback: DINO 미검출 영역은 edge 기반 blob 추출로 보완
+
+    반환:
+      full-frame binary mask (uint8, 0/255) — 사라진 전경 객체 영역
+    """
+    gh, gw = generated_frame.shape[:2]
+    if first_frame.shape[:2] != (gh, gw):
+        first_aligned = cv2.resize(first_frame, (gw, gh), interpolation=cv2.INTER_AREA)
+    else:
+        first_aligned = first_frame
+
+    if object_visible_mask.shape[:2] != (gh, gw):
+        vis = cv2.resize(object_visible_mask, (gw, gh), interpolation=cv2.INTER_NEAREST)
+        vis = (vis > 0).astype(np.uint8) * 255
+    else:
+        vis = object_visible_mask
+
+    # ── 검색 영역: object bbox + margin ──
+    x, y, bw, bh = object_extent_bbox
+    margin = max(bw, bh) // 6
+    rx1 = max(0, x - margin)
+    ry1 = max(0, y - margin)
+    rx2 = min(gw, x + bw + margin)
+    ry2 = min(gh, y + bh + margin)
+    if rx2 <= rx1 or ry2 <= ry1:
+        return np.zeros((gh, gw), dtype=np.uint8)
+
+    roi_orig = first_aligned[ry1:ry2, rx1:rx2]
+    roi_gen = generated_frame[ry1:ry2, rx1:rx2]
+    vis_roi = vis[ry1:ry2, rx1:rx2]
+
+    # ── Step 1: LAB diff로 "사라진 영역" 검출 ──
+    blur1 = cv2.GaussianBlur(roi_orig, (5, 5), 0)
+    blur2 = cv2.GaussianBlur(roi_gen, (5, 5), 0)
+    lab1 = cv2.cvtColor(blur1, cv2.COLOR_BGR2Lab).astype(np.float32)
+    lab2 = cv2.cvtColor(blur2, cv2.COLOR_BGR2Lab).astype(np.float32)
+
+    diff_l = cv2.absdiff(lab1[:, :, 0], lab2[:, :, 0])
+    diff_ab = cv2.magnitude(
+        cv2.absdiff(lab1[:, :, 1], lab2[:, :, 1]),
+        cv2.absdiff(lab1[:, :, 2], lab2[:, :, 2]),
+    )
+    gray1 = cv2.cvtColor(blur1, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    gray2 = cv2.cvtColor(blur2, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    diff_gray = cv2.absdiff(gray1, gray2)
+    diff_score = 0.20 * diff_l + 0.56 * diff_ab + 0.24 * diff_gray
+
+    # 고변화 임계: 변화가 큰 픽셀만 추출
+    high_thr = max(12.0, float(np.percentile(diff_score, 75)))
+    high_diff = (diff_score >= high_thr).astype(np.uint8) * 255
+
+    # 새 객체(냉장고) 마스크 제외 — 살짝 dilate 하여 경계 아티팩트 방지
+    obj_dilated = cv2.dilate(vis_roi, np.ones((7, 7), np.uint8), iterations=2)
+    vanished_region = cv2.bitwise_and(high_diff, cv2.bitwise_not(obj_dilated))
+
+    # 노이즈 제거
+    vanished_region = cv2.morphologyEx(
+        vanished_region, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8), iterations=1,
+    )
+    vanished_region = cv2.morphologyEx(
+        vanished_region, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8), iterations=1,
+    )
+
+    vanished_px = cv2.countNonZero(vanished_region)
+    log.info(f"[VanishedFG] 사라진 영역: {vanished_px}px (thr={high_thr:.1f})")
+    if vanished_px < 50:
+        log.info("[VanishedFG] 사라진 영역 미미 → 스킵")
+        return np.zeros((gh, gw), dtype=np.uint8)
+
+    # ── Step 2: DINO+SAM으로 원본 프레임에서 사라진 객체 세그먼트 ──
+    result_roi = np.zeros((ry2 - ry1, rx2 - rx1), dtype=np.uint8)
+
+    try:
+        dino_bboxes = _dino_detect(first_aligned, _VANISHED_FG_KEYWORDS)
+        log.info(f"[VanishedFG] DINO 원본 프레임 탐지: {len(dino_bboxes)}개")
+
+        for dbbox in dino_bboxes:
+            dx, dy, dw, dh = dbbox
+            lx1 = max(0, dx - rx1)
+            ly1 = max(0, dy - ry1)
+            lx2 = min(rx2 - rx1, dx + dw - rx1)
+            ly2 = min(ry2 - ry1, dy + dh - ry1)
+            if lx2 <= lx1 or ly2 <= ly1:
+                continue
+
+            bbox_patch = np.zeros_like(vanished_region)
+            bbox_patch[ly1:ly2, lx1:lx2] = 255
+            overlap = cv2.countNonZero(cv2.bitwise_and(vanished_region, bbox_patch))
+            bbox_area = max(1, (lx2 - lx1) * (ly2 - ly1))
+            overlap_ratio = overlap / bbox_area
+
+            if overlap_ratio < 0.08:
+                continue
+
+            log.info(
+                f"[VanishedFG] 후보 bbox=({dx},{dy},{dw},{dh}) "
+                f"overlap={overlap_ratio:.2f}"
+            )
+
+            sam_mask = _sam_segment(first_aligned, dbbox)
+            sam_roi = sam_mask[ry1:ry2, rx1:rx2]
+
+            touch = cv2.countNonZero(cv2.bitwise_and(sam_roi, vanished_region))
+            if touch < 20:
+                continue
+
+            sam_valid = cv2.bitwise_and(sam_roi, cv2.bitwise_not(obj_dilated))
+            result_roi = cv2.bitwise_or(result_roi, sam_valid)
+            log.info(
+                f"[VanishedFG] DINO+SAM 채택: touch={touch}px, "
+                f"added={cv2.countNonZero(sam_valid)}px"
+            )
+    except Exception as e:
+        log.warning(f"[VanishedFG] DINO+SAM 실패 (fallback 진행): {e}")
+
+    # ── Step 3: Diff 기반 fallback ──
+    uncovered = cv2.bitwise_and(vanished_region, cv2.bitwise_not(result_roi))
+    uncovered_px = cv2.countNonZero(uncovered)
+
+    if uncovered_px > 100:
+        log.info(f"[VanishedFG] Fallback: 미커버 {uncovered_px}px 처리 중")
+        edge_orig = cv2.Canny(cv2.cvtColor(roi_orig, cv2.COLOR_BGR2GRAY), 40, 120)
+        edge_orig = cv2.dilate(edge_orig, np.ones((3, 3), np.uint8), iterations=1)
+
+        rh, rw = uncovered.shape[:2]
+        n_labels, labels, stats, _ = cv2.connectedComponentsWithStats(uncovered, 8)
+        for i in range(1, n_labels):
+            area = stats[i, cv2.CC_STAT_AREA]
+            if area < 80:
+                continue
+            sw = stats[i, cv2.CC_STAT_WIDTH]
+            sh = stats[i, cv2.CC_STAT_HEIGHT]
+            fill_ratio = area / max(1, sw * sh)
+
+            if sw > rw * 0.6 and sh > rh * 0.6 and fill_ratio > 0.5:
+                continue
+
+            comp = (labels == i).astype(np.uint8) * 255
+            edge_support = cv2.countNonZero(cv2.bitwise_and(comp, edge_orig))
+            edge_ratio = edge_support / max(1, area)
+
+            if edge_ratio < 0.05:
+                continue
+
+            result_roi = cv2.bitwise_or(result_roi, comp)
+            log.info(
+                f"[VanishedFG] fallback blob: area={area}, "
+                f"edge_ratio={edge_ratio:.2f}"
+            )
+
+    # ── 최종 정리 ──
+    result_roi = cv2.morphologyEx(
+        result_roi, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8), iterations=1,
+    )
+
+    out = np.zeros((gh, gw), dtype=np.uint8)
+    out[ry1:ry2, rx1:rx2] = result_roi
+
+    total_px = cv2.countNonZero(out)
+    log.info(f"[VanishedFG] 최종 마스크: {total_px}px")
+    cv2.imwrite(os.path.join(OUTPUTS, "step4_vanished_fg_mask.png"), out)
+    return out
+
+
 def _extract_static_occluder_mask(first_frame, generated_frame, object_extent_bbox, object_visible_mask):
     """
     첫 프레임에 이미 존재하는 정적 전경 오클루더(의자 다리, 테이블 다리, 선반 프레임 등)를 추정한다.
@@ -1433,8 +2096,10 @@ def _extract_static_occluder_mask(first_frame, generated_frame, object_extent_bb
 def step4_extract(first_frame, generated_frame, keyword, anchor_bbox=None):
     """
     추가된 객체 추출.
-    DINO를 이용해 의미론적 후보를 찾은 뒤, 원본과 변화량이 가장 큰 객체를 추출.
-    anchor_bbox가 있으면 그 근처 후보를 우선한다.
+
+    주 경로: Diff-First (diff map → SAM → DINO 검증)
+    폴백 1: DINO-First (기존 semantic diff analyze)
+    폴백 2: DINO 전체 객체 SAM
 
     반환:
       combined_mask: 실제 보이는 합성 객체 마스크
@@ -1444,46 +2109,67 @@ def step4_extract(first_frame, generated_frame, keyword, anchor_bbox=None):
     """
     fh, fw = generated_frame.shape[:2]
 
-    log.info("객체 추출: 의미론적 객체 비교(Semantic Diff) 진행 중...")
-    diff_result = _semantic_diff_analyze(first_frame, generated_frame, keyword, anchor_bbox=anchor_bbox)
-
     combined_mask = np.zeros((fh, fw), dtype=np.uint8)
     object_extent_bbox = anchor_bbox
 
-    if diff_result is not None:
-        diff_bbox, fg_points = diff_result
-        object_extent_bbox = diff_bbox
-        log.info(f"의미론적 추가 객체 발견 → SAM에 힌트 포인트 전달...")
-        combined_mask = _sam_segment(generated_frame, diff_bbox, fg_points=fg_points)
-        combined_mask = _refine_mask(combined_mask, generated_frame, diff_bbox)
+    # ── 주 경로: DINO + Diff 하이브리드 ──
+    log.info("=" * 55)
+    log.info(f"객체 추출: DINO+Diff 하이브리드 (keyword='{keyword}')")
+    log.info("=" * 55)
+    hybrid_result = _diff_primary_extract(
+        first_frame, generated_frame, keyword, anchor_bbox=anchor_bbox,
+    )
+
+    if hybrid_result is not None:
+        combined_mask, object_extent_bbox = hybrid_result
+        log.info(f"[Hybrid] 성공: bbox={object_extent_bbox}, "
+                 f"mask={cv2.countNonZero(combined_mask)}px")
     else:
-        log.warning("의미론적 객체 비교 실패 — DINO 전체 객체 SAM 폴백 진행...")
-        try:
-            all_bboxes = _dino_detect(generated_frame, keyword)
-            if anchor_bbox is not None:
-                scored = []
-                for bb in all_bboxes:
-                    iou = _bbox_iou_xywh(bb, anchor_bbox)
-                    center_dist = _bbox_center_distance_norm(bb, anchor_bbox, fw, fh)
-                    score = iou - center_dist
-                    if center_dist <= 0.22 or iou > 0.01:
-                        scored.append((score, bb))
-                if scored:
-                    scored.sort(reverse=True, key=lambda x: x[0])
-                    all_bboxes = [bb for _, bb in scored[:2]]
+        # ── 폴백: 기존 DINO semantic diff analyze ──
+        log.warning("[Hybrid] 실패 → DINO semantic diff 폴백 진행...")
+        diff_result = _semantic_diff_analyze(
+            first_frame, generated_frame, keyword, anchor_bbox=anchor_bbox,
+        )
+
+        if diff_result is not None:
+            diff_bbox, fg_points = diff_result
+            object_extent_bbox = diff_bbox
+            log.info(f"[Fallback] 의미론적 추가 객체 발견 → SAM 세그먼트")
+            combined_mask = _sam_segment(generated_frame, diff_bbox,
+                                         fg_points=fg_points)
+            combined_mask = _refine_mask(combined_mask, generated_frame,
+                                         diff_bbox)
+        else:
+            # ── 최종 폴백: DINO 전체 객체 SAM ──
+            log.warning("[Fallback] 실패 → DINO 전체 객체 SAM 폴백...")
+            try:
+                all_bboxes = _dino_detect(generated_frame, keyword)
+                if anchor_bbox is not None:
+                    scored = []
+                    for bb in all_bboxes:
+                        iou = _bbox_iou_xywh(bb, anchor_bbox)
+                        center_dist = _bbox_center_distance_norm(
+                            bb, anchor_bbox, fw, fh)
+                        score = iou - center_dist
+                        if center_dist <= 0.22 or iou > 0.01:
+                            scored.append((score, bb))
+                    if scored:
+                        scored.sort(reverse=True, key=lambda x: x[0])
+                        all_bboxes = [bb for _, bb in scored[:2]]
+                        object_extent_bbox = all_bboxes[0]
+                        log.info(f"anchor 기준 폴백 후보 축소: {all_bboxes}")
+                elif all_bboxes:
                     object_extent_bbox = all_bboxes[0]
-                    log.info(f"anchor 기준 폴백 후보 축소: {all_bboxes}")
-            elif all_bboxes:
-                object_extent_bbox = all_bboxes[0]
-            for i, bb in enumerate(all_bboxes):
-                log.info(f"SAM 세그멘테이션 [{i+1}/{len(all_bboxes)}]: bbox={bb}")
-                mask_i = _sam_segment(generated_frame, bb)
-                mask_i = _refine_mask(mask_i, generated_frame, bb)
-                combined_mask = cv2.bitwise_or(combined_mask, mask_i)
-            log.info(f"마스크 결합 완료: {len(all_bboxes)}개 객체")
-        except Exception as e:
-            log.error(f"폴백 DINO 탐지마저 실패했습니다: {e}")
-            raise RuntimeError("객체를 추출할 수 없습니다.")
+                for i, bb in enumerate(all_bboxes):
+                    log.info(f"SAM 세그멘테이션 [{i+1}/{len(all_bboxes)}]: "
+                             f"bbox={bb}")
+                    mask_i = _sam_segment(generated_frame, bb)
+                    mask_i = _refine_mask(mask_i, generated_frame, bb)
+                    combined_mask = cv2.bitwise_or(combined_mask, mask_i)
+                log.info(f"마스크 결합 완료: {len(all_bboxes)}개 객체")
+            except Exception as e:
+                log.error(f"폴백 DINO 탐지마저 실패했습니다: {e}")
+                raise RuntimeError("객체를 추출할 수 없습니다.")
 
     if object_extent_bbox is None:
         coords0 = cv2.findNonZero(combined_mask)
@@ -1498,6 +2184,18 @@ def step4_extract(first_frame, generated_frame, keyword, anchor_bbox=None):
         object_extent_bbox=object_extent_bbox,
         object_visible_mask=combined_mask,
     )
+
+    # ── 사라진 전경 객체 감지 & static_occ에 병합 ──
+    vanished_fg_mask = _extract_vanished_foreground_mask(
+        first_frame=first_frame,
+        generated_frame=generated_frame,
+        object_visible_mask=combined_mask,
+        object_extent_bbox=object_extent_bbox,
+    )
+    vanished_px = cv2.countNonZero(vanished_fg_mask)
+    if vanished_px > 0:
+        log.info(f"사라진 전경 객체 {vanished_px}px → static_occ에 병합")
+        static_occ_mask = cv2.bitwise_or(static_occ_mask, vanished_fg_mask)
 
     # 그림자와 bbox 계산에서 객체 본체가 지나치게 줄지 않도록 erode를 완화한다.
     eroded_mask = cv2.erode(combined_mask, np.ones((3, 3), np.uint8), iterations=1)
