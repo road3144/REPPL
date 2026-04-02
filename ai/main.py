@@ -234,6 +234,12 @@ if not SAM_CKPT:
         f"  위치: {MODELS}"
     )
 
+_SAM2_HF_MODEL_MAP = {
+    "sam2_hiera_l": "facebook/sam2.1-hiera-large",
+    "sam2_hiera_b+": "facebook/sam2.1-hiera-base-plus",
+    "sam2_hiera_s": "facebook/sam2.1-hiera-small",
+}
+
 log.info(f"DINO: ✅ {os.path.basename(DINO_CK)}")
 log.info(f"SAM:  ✅ {SAM_VER}/{SAM_TYPE} ({os.path.basename(SAM_CKPT)})")
 log.info(f"GPU:  {'✅ ' + torch.cuda.get_device_name(0) if torch.cuda.is_available() else '❌ CPU'}")
@@ -265,7 +271,7 @@ def _get_cached_sam_predictor():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     if SAM_VER == "sam2":
         _cached_sam_predictor = SAM2ImagePredictor.from_pretrained(
-            f"facebook/{SAM_TYPE.replace('_', '-')}"
+            _SAM2_HF_MODEL_MAP[SAM_TYPE]
         )
     else:
         _cached_sam_obj = sam_model_registry[SAM_TYPE](checkpoint=SAM_CKPT)
@@ -755,7 +761,7 @@ def _sam_segment(frame, bbox, fg_points=None):
     if SAM_VER == "sam2":
         log.info(f"SAM2: {SAM_TYPE} on {device}")
         predictor = SAM2ImagePredictor.from_pretrained(
-            f"facebook/{SAM_TYPE.replace('_', '-')}"
+            _SAM2_HF_MODEL_MAP[SAM_TYPE]
         )
         predictor.set_image(rgb)
         masks, scores, _ = predictor.predict(
