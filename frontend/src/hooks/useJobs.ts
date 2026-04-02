@@ -42,6 +42,7 @@ export function useJobs() {
   const [previewSelecting, setPreviewSelecting] = useState<{
     jobId: string;
     previews: PreviewItem[];
+    fixed?: boolean;
   } | null>(null);
   const [selectingIndex, setSelectingIndex] = useState(false);
 
@@ -196,22 +197,30 @@ export function useJobs() {
   };
 
   // 고정 프리뷰 (시연용 기믹)
+  const FIXED_VIDEO_KEY = 'public/videos/fixed_composite.mp4';
+  const FIXED_PREVIEWS: PreviewItem[] = [
+    { index: 0, key: 'public/images/preview_fixed_1.png', url: 'https://reppl-bucket.s3.ap-northeast-2.amazonaws.com/public/images/preview_fixed_1.png' },
+    { index: 1, key: 'public/images/preview_fixed_2.png', url: 'https://reppl-bucket.s3.ap-northeast-2.amazonaws.com/public/images/preview_fixed_2.png' },
+    { index: 2, key: 'public/images/preview_fixed_3.png', url: 'https://reppl-bucket.s3.ap-northeast-2.amazonaws.com/public/images/preview_fixed_3.png' },
+  ];
+
   const loadFixedPreviews = (jobId: string) => {
-    setPreviewSelecting({
-      jobId,
-      previews: [
-        { index: 0, key: 'fixed-0', url: 'https://reppl-bucket.s3.ap-northeast-2.amazonaws.com/public/images/preview_fixed_1.png' },
-        { index: 1, key: 'fixed-1', url: 'https://reppl-bucket.s3.ap-northeast-2.amazonaws.com/public/images/preview_fixed_2.png' },
-        { index: 2, key: 'fixed-2', url: 'https://reppl-bucket.s3.ap-northeast-2.amazonaws.com/public/images/preview_fixed_3.png' },
-      ],
-    });
+    setPreviewSelecting({ jobId, previews: FIXED_PREVIEWS, fixed: true });
   };
 
   // 프리뷰 선택 → 합성 작업 시작 (compositeJobId 반환)
   const handleSelectPreview = async (previewJobId: string, selectedIndex: number): Promise<string | null> => {
     try {
       setSelectingIndex(true);
-      const result = await selectPreview(previewJobId, selectedIndex);
+
+      const overrides = previewSelecting?.fixed
+        ? {
+            videoKey: FIXED_VIDEO_KEY,
+            refImageKey: FIXED_PREVIEWS[selectedIndex]?.key,
+          }
+        : undefined;
+
+      const result = await selectPreview(previewJobId, selectedIndex, overrides);
       const compositeStatus = await getJobStatus(result.compositeJobId);
       prependCreatedJob(compositeStatus);
       setPreviewSelecting(null);
