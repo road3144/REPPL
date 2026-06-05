@@ -249,10 +249,3 @@ logs/
 secrets/
 credentials/
 
-**/*claude*/**
-**/*CLAUDE*/**
-**/*CLAUDE*.*
-
-docker-compose.local.yml
-
-**/ssafy-reppl-pjt-a937aaa60067.json
